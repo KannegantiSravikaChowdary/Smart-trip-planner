@@ -1,16 +1,59 @@
 # Bytecode / cache
 __pycache__/
 *.py[cod]
+*.so
+.Python
+*.egg-info/
+dist/
+build/
 
-# Virtual envs
+# Virtual environments
 .venv/
 venv/
+env/
+ENV/
 
-# Environment files
+# Environment and secrets
 .env
+.env.local
+.env.*.local
 
-# SQLite database
-instance/*.db
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Database
+instance/
+*.db
+*.sqlite
+*.sqlite3
 
 # ML artifacts
 ml/*.joblib
+ml/*.pkl
+ml/model_cache/
+
+# Cache
+.cache/
+*.cache
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Uploads (user-generated content)
+app/static/uploads/
+

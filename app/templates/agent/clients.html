@@ -1,3 +1,4 @@
+{% from "partials/phone_input.html" import phone_input %}
 {% extends "base.html" %}
 {% block title %}Client Management{% endblock %}
 {% block content %}
@@ -8,11 +9,22 @@
         <div class="card border-0 shadow-sm mb-3">
             <div class="card-body">
                 <h5>Add Client</h5>
-                <form method="post" action="{{ url_for('agent.add_client') }}" class="row g-2">
-                    <div class="col-md-4"><input class="form-control" name="full_name" placeholder="Full Name" required></div>
-                    <div class="col-md-4"><input class="form-control" name="phone" pattern="^\\+?[0-9][0-9\\s-]{6,18}$" placeholder="Phone"></div>
-                    <div class="col-md-4 d-grid"><button class="btn btn-primary">Add</button></div>
-                    <div class="col-12"><textarea class="form-control" name="notes" placeholder="Notes"></textarea></div>
+                <form method="post" action="{{ url_for('agent.add_client') }}" class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Client Name</label>
+                        <input class="form-control" name="full_name" placeholder="Full Name" required>
+                    </div>
+                    <div class="col-md-5">
+                        {{ phone_input("addClientPhone", "Phone", required=False) }}
+                    </div>
+                    <div class="col-md-3 d-grid">
+                        <button class="btn btn-primary shadow-sm" style="height: 38px;">
+                            <i class="bi bi-plus-lg me-1"></i>Add
+                        </button>
+                    </div>
+                    <div class="col-12 mt-2">
+                        <textarea class="form-control" name="notes" placeholder="Notes (Optional)" rows="2"></textarea>
+                    </div>
                 </form>
             </div>
         </div>
@@ -36,13 +48,7 @@
                                         >
                                     </td>
                                     <td>
-                                        <input
-                                            class="form-control form-control-sm"
-                                            name="phone"
-                                            value="{{ client.phone or '' }}"
-                                            pattern="^\\+?[0-9][0-9\\s-]{6,18}$"
-                                            form="edit-client-{{ client.id }}"
-                                        >
+                                        {{ phone_input("editClientPhone" ~ loop.index, "", existing_value=client.phone or '', required=False, form_attr="edit-client-" ~ client.id, size="sm") }}
                                     </td>
                                     <td>
                                         <input
@@ -54,17 +60,19 @@
                                     </td>
                                     <td>
                                         <form id="edit-client-{{ client.id }}" method="post" action="{{ url_for('agent.edit_client', client_id=client.id) }}"></form>
-                                        <button class="btn btn-sm btn-outline-primary" type="submit" form="edit-client-{{ client.id }}">Save</button>
-                                        <button
-                                            class="btn btn-sm btn-outline-danger"
-                                            type="submit"
-                                            form="edit-client-{{ client.id }}"
-                                            formaction="{{ url_for('agent.delete_client', client_id=client.id) }}"
-                                            formnovalidate
-                                            onclick="return confirm('Delete client?');"
-                                        >
-                                            Delete
-                                        </button>
+                                        <div class="d-flex gap-1">
+                                            <button class="btn btn-xs btn-primary px-3" type="submit" form="edit-client-{{ client.id }}">Save</button>
+                                            <button
+                                                class="btn btn-xs btn-outline-danger"
+                                                type="submit"
+                                                form="edit-client-{{ client.id }}"
+                                                formaction="{{ url_for('agent.delete_client', client_id=client.id) }}"
+                                                formnovalidate
+                                                onclick="return confirm('Delete client?');"
+                                            >
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             {% else %}

@@ -20,6 +20,56 @@
     <div class="col-md-4"><div class="metric-card"><h6><i class="bi bi-cash-coin me-1"></i>Planned Spend</h6><h3>{{ total_spent }}</h3></div></div>
 </div>
 
+{% if recent_bookings %}
+<div class="card border-0 shadow-sm mb-4 bg-primary-subtle border-start border-primary border-4">
+    <div class="card-body">
+        <h5 class="text-primary-emphasis"><i class="bi bi-bell-fill me-2"></i>Booking & Payment Alerts</h5>
+        <div class="list-group list-group-flush bg-transparent">
+            {% for booking in recent_bookings %}
+                <div class="list-group-item bg-transparent d-flex justify-content-between align-items-center px-0">
+                    <div>
+                        <strong>{{ booking.hotel.name }}</strong>
+                        <div class="small text-muted">Trip: {{ booking.trip.title }}</div>
+                    </div>
+                    <div>
+                        {% if booking.payment_status == 'paid' %}
+                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Payment Confirmed</span>
+                        {% elif booking.payment_status == 'verification_pending' %}
+                            <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Verifying Proof</span>
+                        {% elif booking.payment_status == 'pending' and booking.total_price > 0 %}
+                            <span class="badge bg-info"><i class="bi bi-credit-card me-1"></i>Action Required: Pay Now</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Request Pending</span>
+                        {% endif %}
+                        <a href="{{ url_for('traveler.view_trip', trip_id=booking.trip_id) }}" class="btn btn-sm btn-link ms-2">Details</a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% set confirmed_trips = trips|selectattr('status', 'equalto', 'confirmed')|list %}
+{% if confirmed_trips %}
+<div class="card border-0 shadow-sm mb-4 bg-success-subtle border-start border-success border-4">
+    <div class="card-body">
+        <h5 class="text-success-emphasis"><i class="bi bi-check-circle-fill me-2"></i>Trip Interest Accepted!</h5>
+        <div class="list-group list-group-flush bg-transparent">
+            {% for trip in confirmed_trips %}
+                <div class="list-group-item bg-transparent d-flex justify-content-between align-items-center px-0">
+                    <div>
+                        <strong>{{ trip.title }}</strong>
+                        <div class="small text-muted">Start Date: {{ trip.start_date }}</div>
+                    </div>
+                    <a href="{{ url_for('traveler.view_trip', trip_id=trip.id) }}" class="btn btn-sm btn-success">View Trip</a>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
         <h5><i class="bi bi-person-lines-fill me-2"></i>All Agents</h5>

@@ -1,3 +1,4 @@
+import concurrent.futures
 import math
 import random
 import time
@@ -17,6 +18,11 @@ ALL_TIME_SLOTS = ["Early Morning", "Morning", "Afternoon", "Evening", "Night", "
 MIN_SERVICE_CHARGE = 300.0
 MIN_HOTEL_DAILY_PER_ROOM = 800.0
 MIN_FOOD_DAILY_PER_PERSON = 250.0
+
+
+def run_in_context(app, func, *args, **kwargs):
+    with app.app_context():
+        return func(*args, **kwargs)
 
 
 def resolve_time_slots(places_per_day: int | None) -> list[str]:
@@ -164,7 +170,7 @@ def _choose_day_choices(
 def _destination_activities(destination: str, state_country: str, preferences: list[str], minimum_items: int):
     places_api_key = current_app.config.get("GOOGLE_PLACES_API_KEY")
     gemini_api_key = current_app.config.get("GOOGLE_GEMINI_AI_API_KEY")
-    gemini_model = current_app.config.get("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_model = current_app.config.get("GEMINI_MODEL", "gemini-flash-latest")
     try:
         live_pool = fetch_live_destination_activities(
             destination=destination,
@@ -195,9 +201,37 @@ def _build_itinerary_rows(
     itinerary_rows = []
     rng = random.Random(regeneration_seed) if regeneration_seed is not None else None
 
+    app = current_app._get_current_object()
+    pools_by_dest = {}
+    weather_by_day = {}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, len(destinations) * 2 + 1)) as executor:
+        dest_futures = {}
+        for idx, destination_name in enumerate(destinations):
+            minimum_items = max(24, day_distribution[idx] * len(time_slots) + 6)
+            dest_futures[destination_name] = executor.submit(
+                run_in_context, app, _destination_activities, destination_name, trip.state_country, all_preferences, minimum_items
+            )
+        
+        weather_futures = {}
+        temp_day_counter = 1
+        weather_provider = current_app.config.get("WEATHER_PROVIDER", "open-meteo")
+        for idx, destination_name in enumerate(destinations):
+            for _ in range(day_distribution[idx]):
+                day_offset = temp_day_counter - 1
+                weather_futures[(destination_name, day_offset)] = executor.submit(
+                    run_in_context, app, get_live_weather, destination_name, trip.start_date, day_offset, weather_provider
+                )
+                temp_day_counter += 1
+
+        for dest, future in dest_futures.items():
+            pools_by_dest[dest] = future.result()
+
+        for key, future in weather_futures.items():
+            weather_by_day[key] = future.result()
+
     for idx, destination_name in enumerate(destinations):
-        minimum_items = max(24, day_distribution[idx] * len(time_slots) + 6)
-        activity_pool = _destination_activities(destination_name, trip.state_country, all_preferences, minimum_items=minimum_items)
+        activity_pool = pools_by_dest[destination_name]
         if not activity_pool:
             raise RuntimeError(
                 f"No real places found for '{destination_name}'. "
@@ -239,12 +273,10 @@ def _build_itinerary_rows(
                     used_titles_global.add(key)
             prev_day_last_coord = _item_coord(day_choices[-1]) or prev_day_last_coord
 
-            weather_info = get_live_weather(
-                destination_name,
-                trip.start_date,
-                day_counter - 1,
-                provider=current_app.config.get("WEATHER_PROVIDER", "open-meteo"),
-            )
+            day_offset = day_counter - 1
+            weather_info = weather_by_day.get((destination_name, day_offset))
+            if not weather_info:
+                weather_info = {"summary": "Weather update available."}
 
             for slot_idx, time_slot in enumerate(time_slots):
                 choice = day_choices[slot_idx]
@@ -267,6 +299,8 @@ def _build_itinerary_rows(
                         "map_link": map_link,
                         "rating": choice.get("rating", 4.0),
                         "category": choice.get("category", "cultural"),
+                        "latitude": choice.get("lat"),
+                        "longitude": choice.get("lng"),
                     }
                 )
                 total_activity_cost += ticket_price
@@ -305,16 +339,21 @@ def _prepare_plan_data(
     day_distribution = distribute_days(trip.number_of_days, destinations)
     all_preferences = [p.lower() for p in trip.preferences]
     time_slots = resolve_time_slots(places_per_day)
-    itinerary_rows, _total_activity_cost = _build_itinerary_rows(
-        trip,
-        destinations,
-        day_distribution,
-        all_preferences,
-        time_slots,
-        regeneration_seed=regeneration_seed,
-    )
+    app = current_app._get_current_object()
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        future_itinerary = executor.submit(
+            run_in_context, app, _build_itinerary_rows,
+            trip, destinations, day_distribution, all_preferences, time_slots, regeneration_seed
+        )
+        future_hotels = executor.submit(
+            run_in_context, app, recommended_hotels,
+            destinations, trip.state_country, 6, False, None, None
+        )
+        
+        itinerary_rows, _total_activity_cost = future_itinerary.result()
+        hotels = future_hotels.result()
 
-    hotels = recommended_hotels(destinations, state_country=trip.state_country, persist=False)
     average_hotel_rate = 2500.0
     if hotels:
         average_hotel_rate = sum((h.price_min + h.price_max) / 2 for h in hotels) / len(hotels)
@@ -354,6 +393,8 @@ def _snapshot_existing_rows_for_days(trip: Trip, keep_days: set[int]) -> list[di
                 "map_link": item.map_link,
                 "rating": float(item.rating or 4.0),
                 "category": "custom",
+                "latitude": item.latitude,
+                "longitude": item.longitude,
             }
         )
     return sorted(preserved, key=lambda x: (x["day_number"], _time_slot_rank(x["time_slot"]), x["title"]))
@@ -425,6 +466,8 @@ def _apply_plan_data(trip: Trip, plan_data: dict, clear_existing: bool) -> None:
                 weather_summary=row.get("weather_summary"),
                 map_link=row.get("map_link"),
                 rating=float(row.get("rating", 4.0) or 4.0),
+                latitude=row.get("latitude"),
+                longitude=row.get("longitude"),
             )
         )
         db.session.add(
@@ -516,7 +559,7 @@ def generate_trip_plan(trip: Trip, regeneration_seed: int | None = None, places_
 def create_trip_from_form(data: dict, traveler_id=None, agent_id=None, client_id=None):
     trip_kwargs = {
         "title": f"{data['destinations'][0]} Adventure" if data["destinations"] else "Custom Trip",
-        "from_location": data["from_location"],
+        "from_location": data["from_location"].split(",")[0].strip(),
         "destinations_raw": ", ".join(data["destinations"]),
         "state_country": data["state_country"],
         "start_date": data["start_date"],

@@ -11,6 +11,7 @@ from app.extensions import db, login_manager
 
 class TimestampMixin:
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class User(UserMixin, TimestampMixin, db.Model):
@@ -114,6 +115,10 @@ class Trip(TimestampMixin, db.Model):
     per_person_cost = db.Column(db.Float, nullable=False, default=0.0)
     total_group_cost = db.Column(db.Float, nullable=False, default=0.0)
     predicted_budget = db.Column(db.Float, nullable=False, default=0.0)
+    
+    # Post-trip Traveler Feedback
+    feedback_rating = db.Column(db.Integer, nullable=True)
+    feedback_text = db.Column(db.Text, nullable=True)
 
     traveler_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
     agent_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
@@ -180,6 +185,8 @@ class Itinerary(TimestampMixin, db.Model):
     weather_summary = db.Column(db.String(120), nullable=True)
     map_link = db.Column(db.String(255), nullable=True)
     rating = db.Column(db.Float, nullable=True)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
 
     trip = db.relationship("Trip", back_populates="itineraries")
     destination = db.relationship("Destination")
@@ -214,6 +221,8 @@ class Booking(TimestampMixin, db.Model):
     reference_number = db.Column(db.String(80), nullable=True)
     status = db.Column(db.String(20), nullable=False, default="pending")
     payment_status = db.Column(db.String(20), nullable=False, default="pending")
+    utr_number = db.Column(db.String(100), nullable=True)
+    payment_screenshot = db.Column(db.String(255), nullable=True)
     total_price = db.Column(db.Float, nullable=False, default=0.0)
 
     trip = db.relationship("Trip", back_populates="bookings")
@@ -260,6 +269,8 @@ class ItineraryEditRequest(TimestampMixin, db.Model):
     proposed_description = db.Column(db.Text, nullable=False)
     proposed_ticket_price = db.Column(db.Float, nullable=False, default=0.0)
     proposed_map_link = db.Column(db.String(255), nullable=True)
+    proposed_latitude = db.Column(db.Float, nullable=True)
+    proposed_longitude = db.Column(db.Float, nullable=True)
     reviewed_at = db.Column(db.DateTime, nullable=True)
 
     trip = db.relationship("Trip", back_populates="itinerary_edit_requests")

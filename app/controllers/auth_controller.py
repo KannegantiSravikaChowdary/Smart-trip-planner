@@ -62,7 +62,7 @@ def register():
             password = request.form.get("password", "")
             confirm_password = request.form.get("confirm_password", "")
             phone = request.form.get("phone", "").strip()
-            whatsapp_opt_in = bool(request.form.get("whatsapp_opt_in"))
+            whatsapp_opt_in = True
             role = request.form.get("role", "traveler").lower()
 
             if role not in {"traveler", "agent"}:
@@ -193,7 +193,7 @@ def login():
         email = normalize_email(request.form.get("email", ""))
         password = request.form.get("password", "")
         phone = request.form.get("phone", "").strip()
-        whatsapp_opt_in = bool(request.form.get("whatsapp_opt_in"))
+        whatsapp_opt_in = True
         remember = bool(request.form.get("remember"))
 
         if not is_valid_email(email):
@@ -319,13 +319,11 @@ def profile():
 @login_required
 def update_profile():
     phone = request.form.get("phone", "").strip()
-    whatsapp_opt_in = bool(request.form.get("whatsapp_opt_in"))
     if not phone or not is_valid_phone(phone):
         flash("Enter a valid phone number with country code.", "danger")
         return redirect(url_for("auth.profile"))
 
     current_user.phone = phone
-    current_user.whatsapp_opt_in = whatsapp_opt_in
     db.session.commit()
     flash("Profile updated.", "success")
     return redirect(url_for("auth.profile"))

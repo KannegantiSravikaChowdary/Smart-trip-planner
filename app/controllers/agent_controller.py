@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from urllib.parse import quote
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for
@@ -21,7 +21,7 @@ from app.services.trip_service import (
     regenerate_trip,
 )
 from app.services.validation_service import is_valid_full_name, is_valid_phone
-from app.services.whatsapp_service import send_trip_summary_to_traveler, send_trip_whatsapp_notifications
+from app.services.whatsapp_service import send_trip_whatsapp_notifications
 
 
 agent_bp = Blueprint("agent", __name__)
@@ -164,7 +164,6 @@ def trips():
 @role_required("agent")
 def create_trip():
     client_list = Client.query.filter_by(agent_id=current_user.id).all()
-    all_travelers = User.query.filter_by(role="traveler").order_by(User.full_name.asc()).all()
 
     if request.method == "POST":
         try:
@@ -179,29 +178,21 @@ def create_trip():
             return redirect(url_for("agent.create_trip"))
 
         client_id = request.form.get("client_id")
-        if client_id:
+        if not client_id:
+            flash("Client selection is required.", "danger")
+            return redirect(url_for("agent.create_trip"))
+            
+        try:
             client = Client.query.get(int(client_id))
             if not client or client.agent_id != current_user.id:
                 flash("Invalid client selected.", "danger")
                 return redirect(url_for("agent.create_trip"))
             client_id = client.id
-        else:
-            client_id = None
-
-        traveler_id = request.form.get("traveler_id")
-        if not traveler_id:
-            flash("Traveler account is required.", "danger")
-            return redirect(url_for("agent.create_trip"))
-        try:
-            traveler_id_int = int(traveler_id)
         except ValueError:
-            flash("Invalid traveler selected.", "danger")
+            flash("Invalid client selected.", "danger")
             return redirect(url_for("agent.create_trip"))
-        traveler = User.query.filter_by(id=traveler_id_int, role="traveler").first()
-        if not traveler:
-            flash("Select a valid traveler account.", "danger")
-            return redirect(url_for("agent.create_trip"))
-        traveler_id = traveler.id
+
+        traveler_id = None
 
         payload["status"] = request.form.get("status", "draft").lower()
         try:
@@ -221,7 +212,7 @@ def create_trip():
         flash("Client trip generated.", "success")
         return redirect(url_for("agent.view_trip", trip_id=trip.id))
 
-    return render_template("agent/create_trip.html", clients=client_list, all_travelers=all_travelers)
+    return render_template("agent/create_trip.html", clients=client_list)
 
 
 @agent_bp.route("/trips/<int:trip_id>")
@@ -231,6 +222,10 @@ def view_trip(trip_id):
     trip = Trip.query.get_or_404(trip_id)
     if trip.agent_id != current_user.id:
         abort(403)
+
+
+    # New bookings are disabled for completed trips check is in create_booking POST route.
+    # No redirect here to avoid infinite loops.
     if ensure_trip_cost_floor_values(trip):
         db.session.commit()
 
@@ -290,6 +285,11 @@ def view_trip(trip_id):
 def update_trip(trip_id):
     trip = Trip.query.get_or_404(trip_id)
     if trip.agent_id != current_user.id:
+        abort(403)
+
+    if trip.status == "completed":
+        flash("New bookings are disabled for completed trips.", "warning")
+        return redirect(url_for("agent.view_trip", trip_id=trip.id))
         abort(403)
 
     trip.status = request.form.get("status", trip.status).lower()
@@ -360,6 +360,11 @@ def start_trip(trip_id):
     if trip.agent_id != current_user.id:
         abort(403)
 
+    if trip.status == "completed":
+        flash("New bookings are disabled for completed trips.", "warning")
+        return redirect(url_for("agent.view_trip", trip_id=trip.id))
+        abort(403)
+
     trip.status = "in_progress"
     db.session.commit()
     send_trip_whatsapp_notifications(trip, "Trip started")
@@ -375,26 +380,15 @@ def end_trip(trip_id):
     if trip.agent_id != current_user.id:
         abort(403)
 
+    if trip.status == "completed":
+        flash("New bookings are disabled for completed trips.", "warning")
+        return redirect(url_for("agent.view_trip", trip_id=trip.id))
+        abort(403)
+
     trip.status = "completed"
     db.session.commit()
     send_trip_whatsapp_notifications(trip, "Trip completed")
     flash("Trip marked as Completed.", "success")
-    return redirect(url_for("agent.view_trip", trip_id=trip.id))
-
-
-@agent_bp.route("/trips/<int:trip_id>/send-whatsapp-summary", methods=["POST"])
-@login_required
-@role_required("agent")
-def send_whatsapp_summary(trip_id):
-    trip = Trip.query.get_or_404(trip_id)
-    if trip.agent_id != current_user.id:
-        abort(403)
-
-    ok, provider_result = send_trip_summary_to_traveler(trip, requested_by=current_user.full_name)
-    if ok:
-        flash("Full trip summary sent to traveler on WhatsApp.", "success")
-    else:
-        flash(f"WhatsApp send failed: {provider_result}", "danger")
     return redirect(url_for("agent.view_trip", trip_id=trip.id))
 
 
@@ -483,6 +477,9 @@ def delete_trip(trip_id):
     if trip.agent_id != current_user.id:
         abort(403)
 
+
+    # No status check for deletion.
+
     db.session.delete(trip)
     db.session.commit()
     flash("Trip deleted.", "info")
@@ -497,6 +494,11 @@ def create_booking(trip_id):
     if trip.agent_id != current_user.id:
         abort(403)
 
+    if trip.status == "completed":
+        flash("New bookings are disabled for completed trips.", "warning")
+        return redirect(url_for("agent.view_trip", trip_id=trip.id))
+        abort(403)
+
     hotel = Hotel.query.get_or_404(int(request.form.get("hotel_id")))
     checkin = request.form.get("checkin_date")
     checkout = request.form.get("checkout_date")
@@ -504,10 +506,23 @@ def create_booking(trip_id):
     try:
         checkin_date_obj = datetime.strptime(checkin, "%Y-%m-%d").date() if checkin else trip.start_date
         checkout_date_obj = datetime.strptime(checkout, "%Y-%m-%d").date() if checkout else (
-            trip.start_date + timedelta(days=max(1, int(trip.number_of_days)))
+            checkin_date_obj + timedelta(days=1)
         )
+        
+        if checkin_date_obj >= checkout_date_obj:
+            flash("Check-out date must be after check-in date.", "danger")
+            return redirect(url_for("agent.view_trip", trip_id=trip.id))
+            
+        if checkin_date_obj < date.today():
+            flash("Check-in date cannot be in the past.", "danger")
+            return redirect(url_for("agent.view_trip", trip_id=trip.id))
+
+        if checkin_date_obj < trip.start_date:
+            flash(f"Check-in date cannot be before the trip start date ({trip.start_date}).", "danger")
+            return redirect(url_for("agent.view_trip", trip_id=trip.id))
+
     except ValueError:
-        flash("Invalid booking dates.", "danger")
+        flash("Invalid booking dates. Please use YYYY-MM-DD format.", "danger")
         return redirect(url_for("agent.view_trip", trip_id=trip.id))
 
     availability_status, _rooms = get_live_hotel_availability(
@@ -571,11 +586,22 @@ def update_booking(booking_id):
 
     booking.reference_number = request.form.get("reference_number", booking.reference_number)
     booking.status = request.form.get("status", booking.status).lower()
-    booking.payment_status = request.form.get("payment_status", booking.payment_status).lower()
+    
+    # If agent is confirming a booking that was pending payment verification
+    old_payment_status = booking.payment_status
+    new_payment_status = request.form.get("payment_status", booking.payment_status).lower()
+    booking.payment_status = new_payment_status
     booking.total_price = float(request.form.get("total_price", booking.total_price) or booking.total_price)
 
     db.session.commit()
-    flash("Booking updated.", "success")
+    
+    if old_payment_status != "paid" and new_payment_status == "paid":
+        # Notification: Payment confirmed
+        send_trip_whatsapp_notifications(trip, f"Great news! Your payment for booking #{booking.id} ({booking.hotel.name}) has been verified and confirmed.")
+        flash(f"Payment for booking #{booking.id} confirmed. Traveler has been notified.", "success")
+    else:
+        flash("Booking updated.", "success")
+        
     return redirect(url_for("agent.bookings"))
 
 
@@ -586,6 +612,9 @@ def submit_food_feedback(trip_id):
     trip = Trip.query.get_or_404(trip_id)
     if trip.agent_id != current_user.id:
         abort(403)
+
+
+    # Allow food feedback for completed trips.
 
     actual_food_cost_raw = request.form.get("actual_food_cost", "").strip()
     actual_total_cost_raw = request.form.get("actual_total_cost", "").strip()
@@ -610,5 +639,32 @@ def submit_food_feedback(trip_id):
         actual_total_cost=actual_total_cost,
         source_role="agent",
     )
-    flash("Real food-cost data saved for ML training.", "success")
+    flash("Actual food costs recorded for machine learning improvement.", "success")
+    return redirect(url_for("agent.view_trip", trip_id=trip.id))
+
+
+@agent_bp.route("/trips/<int:trip_id>/accept-interest", methods=["POST"])
+@login_required
+@role_required("agent")
+def accept_interest(trip_id):
+    trip = Trip.query.get_or_404(trip_id)
+    if trip.agent_id != current_user.id:
+        abort(403)
+
+    if trip.status == "completed":
+        flash("New bookings are disabled for completed trips.", "warning")
+        return redirect(url_for("agent.view_trip", trip_id=trip.id))
+        abort(403)
+        
+    if trip.status != "liked":
+        flash("Trip interest can only be accepted if the traveler liked it.", "warning")
+        return redirect(url_for("agent.view_trip", trip_id=trip.id))
+
+    trip.status = "confirmed"
+    db.session.commit()
+    
+    # Notify traveler via WhatsApp
+    send_trip_whatsapp_notifications(trip, f"The agent ({current_user.full_name}) has accepted your interest and now the trip is confirmed!")
+    
+    flash("Interest accepted. Trip is now confirmed.", "success")
     return redirect(url_for("agent.view_trip", trip_id=trip.id))

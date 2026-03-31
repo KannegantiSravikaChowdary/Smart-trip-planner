@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Trip Details{% endblock %}
 {% block content %}
+
 {% set destination_fallback = url_for('static', filename='img/destination-fallback.svg') %}
 {% set hotel_fallback = url_for('static', filename='img/hotel-fallback.svg') %}
 {% set hotel_images = [
@@ -9,15 +10,27 @@
     'https://images.unsplash.com/photo-1519821172141-b5d8fca4d6c7?auto=format&fit=crop&w=900&q=80',
     'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=900&q=80'
 ] %}
+
+
+
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
     <div>
         <h2>{{ trip.title }}</h2>
-        <p class="text-muted mb-1"><i class="bi bi-geo-alt-fill me-1"></i>{{ trip.destinations_raw }} | <i class="bi bi-calendar3 me-1"></i>{{ trip.number_of_days }} days | <i class="bi bi-people-fill me-1"></i>{{ trip.number_of_people }} traveler(s)</p>
+        <p class="text-muted mb-1">
+            <i class="bi bi-geo-alt-fill me-1"></i><strong>{{ trip.from_location }}</strong> to {{ trip.destinations_raw }} | 
+            <i class="bi bi-calendar3 me-1"></i>{{ trip.number_of_days }} days | 
+            <i class="bi bi-people-fill me-1"></i>{{ trip.number_of_people }} traveler(s)
+        </p>
         <p class="mb-1"><i class="bi bi-person-badge me-1"></i>Managed by: {{ trip.agent.full_name if trip.agent else 'Self-managed' }}</p>
         <span class="badge text-bg-info">{{ trip.status|title }}</span>
         {% if trip.status == 'sent' %}
-            <form method="post" action="{{ url_for('traveler.approve_trip', trip_id=trip.id) }}" class="d-inline ms-2">
-                <button class="btn btn-sm btn-success">Approve Latest Agent Changes</button>
+            <form method="post" action="{{ url_for('traveler.like_trip', trip_id=trip.id) }}" class="d-inline ms-2">
+                <button class="btn btn-sm btn-success">
+                    <i class="bi bi-heart-fill me-1"></i>I liked it and I want to travel
+                </button>
+            </form>
+            <form method="post" action="{{ url_for('traveler.approve_trip', trip_id=trip.id) }}" class="d-inline ms-1">
+                <button class="btn btn-sm btn-outline-success">Approve Latest Agent Changes</button>
             </form>
         {% endif %}
     </div>
@@ -149,6 +162,46 @@
 </div>
 {% endif %}
 
+
+        {% if trip.status == 'completed' and not trip.feedback_rating %}
+        <div class="card border-0 shadow-sm mb-4 bg-light border-start border-primary border-4">
+            <div class="card-body">
+                <h5><i class="bi bi-star-fill text-warning me-2"></i>Trip Feedback (Optional)</h5>
+                <p class="text-muted small">We hope you had a great journey! Please share your experience with the agent.</p>
+                <form method="post" action="{{ url_for('traveler.submit_feedback', trip_id=trip.id) }}">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label small">Rating</label>
+                            <select name="rating" class="form-select form-select-sm">
+                                <option value="5">5 - Excellent</option>
+                                <option value="4">4 - Very Good</option>
+                                <option value="3" selected>3 - Good</option>
+                                <option value="2">2 - Fair</option>
+                                <option value="1">1 - Poor</option>
+                            </select>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label small">Your Comments</label>
+                            <input class="form-control form-control-sm" name="feedback_text" placeholder="Share your thoughts...">
+                        </div>
+                        <div class="col-md-2 d-grid align-items-end">
+                            <button class="btn btn-sm btn-primary">Submit</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% elif trip.feedback_rating %}
+        <div class="card border-0 shadow-sm mb-4 bg-success-subtle">
+            <div class="card-body py-2">
+                <p class="mb-0 small text-success-emphasis">
+                    <i class="bi bi-check-circle-fill me-1"></i>
+                    <strong>Your Feedback:</strong> {{ trip.feedback_rating }}/5 stars - "{{ trip.feedback_text }}"
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
 <div class="row g-3 mb-4">
     <div class="col-md-4"><div class="metric-card"><h6><i class="bi bi-airplane-fill me-1"></i>Transport</h6><h4>{{ trip.transport_cost }}</h4></div></div>
     <div class="col-md-4"><div class="metric-card"><h6><i class="bi bi-building me-1"></i>Hotel</h6><h4>{{ trip.hotel_cost }}</h4></div></div>
@@ -257,21 +310,28 @@
                         <div class="d-flex gap-2 flex-wrap mb-2">
                             <a class="btn btn-sm btn-outline-dark" target="_blank" href="{{ hotel.map_link }}"><i class="bi bi-pin-map me-1"></i>Map</a>
                         </div>
+                        {% if trip.status != 'completed' %}
                         <form method="post" action="{{ booking_form_action }}" class="row g-2">
                             <input type="hidden" name="hotel_id" value="{{ hotel.id }}">
                             <div class="col-6">
-                                <input class="form-control form-control-sm" type="date" name="checkin_date" required>
+                                <label class="form-label small text-muted mb-1">Check-in</label>
+                                <input class="form-control form-control-sm" type="date" name="checkin_date" value="{{ trip.start_date }}" min="{{ trip.start_date }}" required>
                             </div>
                             <div class="col-6">
-                                <input class="form-control form-control-sm" type="date" name="checkout_date" required>
+                                <label class="form-label small text-muted mb-1">Check-out</label>
+                                <input class="form-control form-control-sm" type="date" name="checkout_date" value="{{ (trip.start_date + timedelta(days=1)) }}" min="{{ trip.start_date }}" required>
                             </div>
-                            <div class="col-7">
-                                <input class="form-control form-control-sm" type="number" step="0.01" name="total_price" placeholder="Total price" title="Optional: enter the final booking amount charged by hotel.">
-                            </div>
-                            <div class="col-5 d-grid">
-                                <button class="btn btn-sm btn-primary" type="submit" {% if availability == 'Sold Out' %}disabled{% endif %}>Book</button>
+                            <div class="col-12 d-grid mt-2">
+                                <button class="btn btn-sm btn-primary py-2" type="submit" {% if availability == 'Sold Out' %}disabled{% endif %}>
+                                    <i class="bi bi-calendar-check me-1"></i>Request Booking
+                                </button>
                             </div>
                         </form>
+                        {% else %}
+                        <div class="alert alert-light border-0 py-2 mb-0 mt-2 small">
+                            <i class="bi bi-info-circle me-1"></i>Bookings disabled (Completed).
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             {% else %}
@@ -288,17 +348,121 @@
             <div class="table-responsive">
                 <table class="table table-sm align-middle">
                     <thead>
-                        <tr><th>Hotel</th><th>Check-in</th><th>Check-out</th><th>Status</th><th>Payment</th><th>Reference</th></tr>
+                        <tr>
+                            <th>Hotel</th>
+                            <th>Dates</th>
+                            <th>Amount</th>
+                            <th>Status/Payment</th>
+                            <th>Action</th>
+                        </tr>
                     </thead>
                     <tbody>
                         {% for booking in bookings %}
                             <tr>
-                                <td>{{ booking.hotel.name }}</td>
-                                <td>{{ booking.checkin_date or '-' }}</td>
-                                <td>{{ booking.checkout_date or '-' }}</td>
-                                <td>{{ booking.status|title }}</td>
-                                <td>{{ booking.payment_status|title }}</td>
-                                <td>{{ booking.reference_number or '-' }}</td>
+                                <td>
+                                    <strong>{{ booking.hotel.name }}</strong>
+                                    {% if booking.reference_number %}
+                                        <div class="small text-muted">Ref: {{ booking.reference_number }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="small">{{ booking.checkin_date }}<br>{{ booking.checkout_date }}</td>
+                                <td>
+                                    {% if booking.total_price > 0 %}
+                                        <strong>₹{{ "{:,.2f}".format(booking.total_price) }}</strong>
+                                    {% else %}
+                                        <span class="text-muted italic">Awaiting Agent</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge {% if booking.status == 'confirmed' %}bg-success{% elif booking.status == 'cancelled' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                        {{ booking.status|title }}
+                                    </span>
+                                    <div class="mt-1">
+                                        {% if booking.payment_status == 'paid' %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Paid</span>
+                                        {% elif booking.payment_status == 'verification_pending' %}
+                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">In Verification</span>
+                                        {% elif booking.payment_status == 'pending' and booking.total_price > 0 %}
+                                            <span class="badge bg-info-subtle text-info border border-info-subtle">Awaiting Payment</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-muted border">Pending</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if (booking.payment_status == 'pending' and booking.total_price > 0) or (request.args.get('pop_payment')|int == booking.id) %}
+                                        <button class="btn btn-xs btn-primary" data-bs-toggle="modal" data-bs-target="#payModal{{ booking.id }}">
+                                            Pay Now
+                                        </button>
+                                        
+                                        <!-- QR Payment Modal -->
+                                        <div class="modal fade" id="payModal{{ booking.id }}" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Pay for {{ booking.hotel.name }}</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center">
+                                                        {% if booking.total_price > 0 %}
+                                                            <h6>Total Amount: ₹{{ "{:,.2f}".format(booking.total_price) }}</h6>
+                                                            {% set pay_amount = booking.total_price %}
+                                                        {% else %}
+                                                            <h6 class="text-primary">Initial Booking Deposit: ₹2,000.00</h6>
+                                                            <p class="small text-muted">Awaiting final hotel price from agent. Pay ₹2000 now to secure your request.</p>
+                                                            {% set pay_amount = 2000.0 %}
+                                                        {% endif %}
+                                                        <p class="text-muted small mb-3">Scan this QR code with any UPI app (GPay, PhonePe, Paytm)</p>
+                                                        
+                                                        {% set upi_id = "6300100945@axl" %}
+                                                        {% set upi_url = "upi://pay?pa=" ~ upi_id ~ "&pn=SmartTripPlanner&mc=0000&tid=BOOKING" ~ booking.id ~ "&tr=" ~ booking.id ~ "&tn=Booking+Payment&am=" ~ pay_amount ~ "&cu=INR" %}
+                                                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={{ upi_url|urlencode }}" 
+                                                             class="img-fluid rounded shadow-sm border mb-4" 
+                                                             alt="UPI QR Code"
+                                                             style="max-width: 250px;">
+                                                             
+                                                        <div class="bg-light p-3 rounded mb-4">
+                                                            <p class="mb-1 small text-muted">UPI ID</p>
+                                                            <h5 class="mb-0">{{ upi_id }}</h5>
+                                                        </div>
+                                                        
+                                                        <hr>
+                                                        
+                                                        <div id="paymentActions{{ booking.id }}">
+                                                            <button class="btn btn-success w-100 mb-2" onclick="document.getElementById('paymentActions{{ booking.id }}').style.display='none'; document.getElementById('paymentForm{{ booking.id }}').style.display='block';">
+                                                                <i class="bi bi-check-circle me-1"></i>I have Paid
+                                                            </button>
+                                                            <button class="btn btn-outline-danger w-100" data-bs-dismiss="modal">
+                                                                <i class="bi bi-x-circle me-1"></i>Cancel / Decline
+                                                            </button>
+                                                        </div>
+                                                        
+                                                        <div id="paymentForm{{ booking.id }}" style="display: none;">
+                                                            <h6 class="mb-3">Submit Payment Proof</h6>
+                                                            <form action="/traveler/bookings/{{ booking.id }}/submit_payment" method="POST" enctype="multipart/form-data" class="text-start">
+                                                                <div class="mb-3">
+                                                                    <label class="form-label small">UTR Number / Transaction ID</label>
+                                                                    <input type="text" name="utr_number" class="form-control" placeholder="12-digit UTR number" required>
+                                                                </div>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label small">Payment Screenshot</label>
+                                                                    <input type="file" name="screenshot" class="form-control" accept="image/*" required>
+                                                                </div>
+                                                                <button type="submit" class="btn btn-primary w-100">Submit Verification Request</button>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% elif booking.payment_status == 'verification_pending' %}
+                                        <span class="text-info small"><i class="bi bi-clock-history me-1"></i>Pending Verify</span>
+                                    {% elif booking.payment_status == 'paid' %}
+                                        <span class="text-success small"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>
+                                    {% else %}
+                                        <span class="text-muted small">Wait for Agent</span>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -309,6 +473,13 @@
         {% endif %}
     </div>
 </div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+    </div>
+</div>
+
+
 
 <div class="card border-0 shadow-sm">
     <div class="card-body">
@@ -323,7 +494,26 @@
                             <p class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i>{{ item.destination.name if item.destination else '-' }}</p>
                             <h6 class="mb-1">{{ item.title }}</h6>
                             <p class="mb-1">{{ item.description }}</p>
-                            <p class="mb-1"><i class="bi bi-ticket-perforated me-1"></i>{{ item.ticket_price }} | <i class="bi bi-star-fill me-1"></i>{{ item.rating }}</p>
+                            
+                            {% set transport_keywords = ['flight', 'train', 'bus', 'eurostar', 'ferry', 'shuttle'] %}
+                            {% set is_transport = false %}
+                            {% for kw in transport_keywords %}
+                                {% if kw in item.title.lower() or kw in item.description.lower() %}
+                                    {% set is_transport = true %}
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if is_transport %}
+                                <div class="mt-2">
+                                    <button class="tracking-btn" onclick="openTracker('{{ item.title }}', '{{ item.time_slot }}')">
+                                        <i class="bi bi-broadcast me-1"></i>Track Live Status
+                                    </button>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <p class="mb-1"><i class="bi bi-ticket-perforated me-1"></i>{{ item.ticket_price }} | <i class="bi bi-star-fill me-1"></i>{{ item.rating }}</p>
+                            </div>
                             <p class="mb-2"><i class="bi bi-cloud-sun me-1"></i>{{ item.weather_summary }}</p>
                             <a class="btn btn-sm btn-outline-primary" target="_blank" href="{{ item.map_link }}"><i class="bi bi-geo-alt-fill me-1"></i>Google Maps</a>
                         </div>
@@ -333,4 +523,92 @@
         {% endfor %}
     </div>
 </div>
+
+<!-- Transport Tracker Modal -->
+<div class="modal fade" id="trackerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-radar me-2"></i>Live Transport Tracker</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-4">
+                    <div class="badge bg-success mb-2"><span class="status-pulse"></span>ON TIME</div>
+                    <h4 id="trackerTitle" class="fw-bold mb-1">Flight to London</h4>
+                    <p id="trackerSlot" class="text-muted small">Scheduled: Morning Slot</p>
+                </div>
+
+                <div class="tracker-container">
+                    <div class="tracker-progress-bar-container">
+                        <i class="bi bi-geo-alt-fill tracker-icon-start"></i>
+                        <i class="bi bi-airplane-fill tracker-icon-end"></i>
+                        <div id="trackerProgress" class="tracker-progress-bar"></div>
+                    </div>
+                    <div class="d-flex justify-content-between small fw-bold text-muted">
+                        <span>ORIGIN</span>
+                        <span>DESTINATION</span>
+                    </div>
+                </div>
+
+                <div class="row mt-4 g-3 text-center">
+                    <div class="col-4">
+                        <div class="small text-muted">GATE</div>
+                        <div class="fw-bold">B12</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">TERMINAL</div>
+                        <div class="fw-bold">2</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">ALTITUDE</div>
+                        <div class="fw-bold">32k ft</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-light w-100" data-bs-dismiss="modal">Close Status</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openTracker(title, slot) {
+    document.getElementById('trackerTitle').innerText = title;
+    document.getElementById('trackerSlot').innerText = 'Scheduled: ' + slot;
+    
+    // Reset progress
+    const progressBar = document.getElementById('trackerProgress');
+    progressBar.style.width = '0%';
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('trackerModal'));
+    modal.show();
+    
+    // Animate progress after a short delay
+    setTimeout(() => {
+        progressBar.style.width = '65%';
+    }, 500);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-open payment modal if requested
+    const urlParams = new URLSearchParams(window.location.search);
+    const popBookingId = urlParams.get('pop_payment');
+    if (popBookingId) {
+        const modalId = 'payModal' + popBookingId;
+        const modalEl = document.getElementById(modalId);
+        if (modalEl) {
+            const payModal = new bootstrap.Modal(modalEl);
+            payModal.show();
+            
+            // Remove the parameter from URL to prevent reopening on reload
+            urlParams.delete('pop_payment');
+            const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    }
+});
+</script>
 {% endblock %}

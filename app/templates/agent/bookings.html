@@ -13,30 +13,59 @@
         <div class="card border-0 shadow-sm p-3">
             <div class="table-responsive">
                 <table class="table align-middle">
-                    <thead><tr><th>Trip</th><th>Hotel</th><th>Check-in</th><th>Status</th><th>Payment</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Trip / Hotel</th><th>Check-in</th><th>Status</th><th>Payment Info</th><th>Proof</th><th>Verification Action</th></tr></thead>
                     <tbody>
                         {% for booking in bookings %}
                             <tr>
-                                <td>{{ booking.trip.title }}</td>
-                                <td>{{ booking.hotel.name }}</td>
-                                <td>{{ booking.checkin_date or '-' }}</td>
-                                <td>{{ booking.status|title }}</td>
-                                <td>{{ booking.payment_status|title }}</td>
                                 <td>
-                                    <form method="post" action="{{ url_for('agent.update_booking', booking_id=booking.id) }}" class="d-flex gap-1">
-                                        <select class="form-select form-select-sm" name="status">
-                                            {% for st in ['pending','confirmed','cancelled'] %}
-                                                <option value="{{ st }}" {% if booking.status == st %}selected{% endif %}>{{ st|title }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        <select class="form-select form-select-sm" name="payment_status">
-                                            {% for st in ['pending','paid'] %}
-                                                <option value="{{ st }}" {% if booking.payment_status == st %}selected{% endif %}>{{ st|title }}</option>
-                                            {% endfor %}
-                                        </select>
-                                        <input class="form-control form-control-sm" name="reference_number" value="{{ booking.reference_number or '' }}" placeholder="Reference">
-                                        <input class="form-control form-control-sm" type="number" step="0.01" name="total_price" value="{{ booking.total_price }}">
-                                        <button class="btn btn-sm btn-outline-primary">Save</button>
+                                    <strong>{{ booking.trip.title }}</strong><br>
+                                    <small class="text-muted">{{ booking.hotel.name }}</small>
+                                </td>
+                                <td class="small">{{ booking.checkin_date or '-' }}</td>
+                                <td>
+                                    <span class="badge {% if booking.status == 'confirmed' %}bg-success{% elif booking.status == 'cancelled' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                        {{ booking.status|title }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="small fw-bold">{{ booking.payment_status|title }}</div>
+                                    {% if booking.utr_number %}
+                                        <div class="small text-muted">UTR: {{ booking.utr_number or '-' }}</div>
+                                    {% endif %}
+                                    <div class="small">₹{{ "{:,.2f}".format(booking.total_price) }}</div>
+                                </td>
+                                <td>
+                                    {% if booking.payment_screenshot %}
+                                        <a href="{{ url_for('static', filename='uploads/payments/' ~ booking.payment_screenshot) }}" target="_blank" class="btn btn-xs btn-outline-info">
+                                            <i class="bi bi-image me-1"></i>View
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted small">No Proof</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="post" action="{{ url_for('agent.update_booking', booking_id=booking.id) }}" class="row g-1">
+                                        <div class="col-6">
+                                            <select class="form-select form-select-sm" name="status">
+                                                {% for st in ['pending','confirmed','cancelled'] %}
+                                                    <option value="{{ st }}" {% if booking.status == st %}selected{% endif %}>{{ st|title }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <select class="form-select form-select-sm" name="payment_status">
+                                                {% for st in ['pending','verification_pending','paid'] %}
+                                                    <option value="{{ st }}" {% if booking.payment_status == st %}selected{% endif %}>{{ st.replace('_', ' ')|title }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-12 mt-1">
+                                            <div class="input-group input-group-sm">
+                                                <input class="form-control" type="number" step="0.01" name="total_price" value="{{ booking.total_price }}" placeholder="Final Price">
+                                                <button class="btn btn-primary" title="Update Status & Price">Save</button>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" name="reference_number" value="{{ booking.reference_number or '' }}">
                                     </form>
                                 </td>
                             </tr>

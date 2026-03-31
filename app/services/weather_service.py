@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 
 from flask import current_app
 
+from app.services.cache_service import api_cache
 from app.services.gemini_service import gemini_generate_json
 
 
@@ -44,6 +45,7 @@ def _fetch_json(url: str, timeout: int = 10):
 
 
 @lru_cache(maxsize=256)
+@api_cache.memoize(key_prefix="weather_coords", expiry_seconds=604800)
 def _resolve_coordinates(destination: str):
     params = urlencode(
         {
@@ -66,6 +68,7 @@ def _resolve_coordinates(destination: str):
 
 
 @lru_cache(maxsize=1024)
+@api_cache.memoize(key_prefix="openmeteo_daily", expiry_seconds=43200)
 def _open_meteo_daily(destination: str, iso_date: str):
     coords = _resolve_coordinates(destination.strip().lower())
     if not coords:
@@ -95,6 +98,7 @@ def _open_meteo_daily(destination: str, iso_date: str):
 
 
 @lru_cache(maxsize=1024)
+@api_cache.memoize(key_prefix="gemini_weather", expiry_seconds=86400)
 def _gemini_weather(destination: str, iso_date: str, api_key: str, model: str):
     prompt = (
         "Return only JSON object with keys: condition, min_temp_c, max_temp_c.\n"
@@ -129,7 +133,7 @@ def get_live_weather(destination: str, start_date: date, day_offset: int, provid
     target_date = start_date + timedelta(days=day_offset)
     iso_date = target_date.isoformat()
     api_key = current_app.config.get("GOOGLE_GEMINI_AI_API_KEY")
-    model = current_app.config.get("GEMINI_MODEL", "gemini-2.5-flash")
+    model = current_app.config.get("GEMINI_MODEL", "gemini-flash-latest")
 
     providers = [provider, "open-meteo", "gemini"] if provider not in {"open-meteo", "gemini"} else [provider]
     if "open-meteo" not in providers:

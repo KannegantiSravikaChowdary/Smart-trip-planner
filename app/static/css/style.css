@@ -225,8 +225,10 @@ h1, h2, h3, h4, h5, .navbar-brand {
 .agent-sidebar {
     background: linear-gradient(180deg, #273a57, #17283f);
     color: #fff;
-    height: 100%;
+    height: fit-content;
     min-height: 280px;
+    position: sticky;
+    top: 0;
 }
 
 .agent-sidebar .btn {
@@ -261,4 +263,128 @@ pre {
     .classic-banner img {
         height: 180px;
     }
+}
+
+/* Packing Checklist Styles */
+.packing-item {
+    transition: all 0.2s ease;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.packing-item:hover {
+    background: rgba(var(--primary-rgb), 0.05);
+}
+
+.packing-item input[type="checkbox"] {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin-right: 0.75rem;
+    cursor: pointer;
+}
+
+.packing-item.checked {
+    opacity: 0.6;
+}
+
+.packing-item.checked .item-text {
+    text-decoration: line-through;
+}
+
+.packing-category-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--primary-deep);
+    letter-spacing: 0.05rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 2px solid var(--primary-light);
+    display: inline-block;
+}
+
+.packing-category-title:first-of-type {
+    margin-top: 0;
+}
+
+/* Transport Tracker Styles */
+.tracker-container {
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 1rem;
+}
+
+.tracker-progress-bar-container {
+    height: 10px;
+    background: #e9ecef;
+    border-radius: 5px;
+    position: relative;
+    margin: 2rem 0;
+    overflow: hidden;
+}
+
+.tracker-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--primary-deep));
+    width: 0%;
+    transition: width 3s ease-out;
+}
+
+.tracker-icon-start, .tracker-icon-end {
+    position: absolute;
+    top: -30px;
+    font-size: 1.2rem;
+    color: var(--primary-deep);
+}
+
+.tracker-icon-start { left: 0; }
+.tracker-icon-end { right: 0; }
+
+.status-pulse {
+    width: 10px;
+    height: 10px;
+    background: #28a745;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+    box-shadow: 0 0 0 rgba(40, 167, 69, 0.4);
+    animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+}
+
+.tracking-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 2rem;
+    background: rgba(var(--primary-rgb), 0.1);
+    color: var(--primary-deep);
+    border: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.tracking-btn:hover {
+    background: var(--primary-deep);
+    color: white;
+}
+
+/* Hide default browser password reveal icons */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+    display: none;
+}
+
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+    visibility: hidden;
+    display: none !important;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
 }

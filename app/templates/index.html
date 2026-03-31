@@ -8,9 +8,17 @@
             <h1 class="display-5 fw-bold mb-3">Craft Elegant Trips With AI Precision</h1>
             <p class="lead text-secondary">Plan complete itineraries, estimate budgets, and manage hotel bookings through polished traveler and travel-agent dashboards.</p>
             <div class="d-flex flex-wrap gap-2 mt-4">
-                <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg"><i class="bi bi-stars me-2"></i>Start Planning</a>
-                <a href="{{ url_for('auth.login') }}" class="btn btn-outline-dark btn-lg"><i class="bi bi-door-open me-2"></i>Sign In</a>
-                <a href="/auth/google/start?mode=login" class="btn btn-outline-danger btn-lg"><i class="bi bi-google me-2"></i>Google Sign-In</a>
+                {% if current_user.is_authenticated %}
+                    {% if current_user.role == 'agent' %}
+                        <a href="{{ url_for('agent.dashboard') }}" class="btn btn-primary btn-lg"><i class="bi bi-speedometer2 me-2"></i>Agent Dashboard</a>
+                    {% else %}
+                        <a href="{{ url_for('traveler.dashboard') }}" class="btn btn-primary btn-lg"><i class="bi bi-speedometer2 me-2"></i>Traveler Dashboard</a>
+                    {% endif %}
+                {% else %}
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg"><i class="bi bi-stars me-2"></i>Start Planning</a>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-dark btn-lg"><i class="bi bi-door-open me-2"></i>Sign In</a>
+                    <a href="/auth/google/start?mode=login" class="btn btn-outline-danger btn-lg"><i class="bi bi-google me-2"></i>Google Sign-In</a>
+                {% endif %}
             </div>
         </div>
         <div class="col-lg-6">

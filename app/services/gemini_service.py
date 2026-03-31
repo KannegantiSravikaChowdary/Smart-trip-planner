@@ -52,7 +52,7 @@ def _load_json_from_text(text: str):
 def gemini_generate_json(
     prompt: str,
     api_key: str,
-    model: str = "gemini-3-flash-preview",
+    model: str = "gemini-flash-latest",
     temperature: float = 0.2,
     attempts: int = 2,
     timeout_seconds: int = 12,
@@ -72,6 +72,7 @@ def gemini_generate_json(
     }
     body = json.dumps(request_body).encode("utf-8")
 
+    last_error = None
     for attempt in range(max(1, attempts)):
         try:
             request = Request(
@@ -86,18 +87,26 @@ def gemini_generate_json(
             with urlopen(request, timeout=timeout_seconds) as response:
                 payload = json.loads(response.read().decode("utf-8"))
             text = _extract_text(payload)
-            return _load_json_from_text(text)
-        except (TimeoutError, URLError, HTTPError, json.JSONDecodeError):
+            result = _load_json_from_text(text)
+            return result
+        except (TimeoutError, URLError, HTTPError, json.JSONDecodeError) as e:
+            last_error = e
             if attempt < attempts - 1:
                 time.sleep(0.6 * (attempt + 1))
                 continue
-            return None
+        except Exception as e:
+            last_error = e
+            if attempt < attempts - 1:
+                time.sleep(0.6 * (attempt + 1))
+                continue
+    
+    return None
 
 
 def gemini_generate_text(
     prompt: str,
     api_key: str,
-    model: str = "gemini-2.5-flash",
+    model: str = "gemini-flash-latest",
     temperature: float = 0.4,
     attempts: int = 2,
     timeout_seconds: int = 12,
@@ -116,7 +125,7 @@ def gemini_generate_text(
 def gemini_generate_text_result(
     prompt: str,
     api_key: str,
-    model: str = "gemini-2.5-flash",
+    model: str = "gemini-flash-latest",
     temperature: float = 0.4,
     attempts: int = 2,
     timeout_seconds: int = 12,

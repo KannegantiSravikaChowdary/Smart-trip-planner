@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from urllib.request import Request
 from urllib.request import urlopen
 
+from app.services.cache_service import api_cache
 from app.services.gemini_service import gemini_generate_json
 
 
@@ -17,45 +18,45 @@ DEFAULT_DESTINATION_IMAGES = {
     "goa": "https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=1200&q=80",
     "jaipur": "https://images.unsplash.com/photo-1599661046827-dacde6976544?auto=format&fit=crop&w=1200&q=80",
     "manali": "https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80",
-    "bangalore": "https://source.unsplash.com/1200x700/?bengaluru,india,city",
-    "bengaluru": "https://source.unsplash.com/1200x700/?bengaluru,india,city",
-    "hyderabad": "https://source.unsplash.com/1200x700/?hyderabad,india,charminar",
-    "chennai": "https://source.unsplash.com/1200x700/?chennai,india,marina-beach",
-    "kolkata": "https://source.unsplash.com/1200x700/?kolkata,india,howrah-bridge",
-    "pune": "https://source.unsplash.com/1200x700/?pune,india,city",
-    "ahmedabad": "https://source.unsplash.com/1200x700/?ahmedabad,india,city",
-    "surat": "https://source.unsplash.com/1200x700/?surat,india,city",
-    "lucknow": "https://source.unsplash.com/1200x700/?lucknow,india,imambara",
-    "amritsar": "https://source.unsplash.com/1200x700/?amritsar,golden-temple,india",
-    "varanasi": "https://source.unsplash.com/1200x700/?varanasi,ghats,india",
-    "agra": "https://source.unsplash.com/1200x700/?agra,taj-mahal,india",
-    "rishikesh": "https://source.unsplash.com/1200x700/?rishikesh,ganga,india",
-    "haridwar": "https://source.unsplash.com/1200x700/?haridwar,ganga,india",
-    "shimla": "https://source.unsplash.com/1200x700/?shimla,himachal,india",
-    "dharamshala": "https://source.unsplash.com/1200x700/?dharamshala,himachal,india",
-    "leh": "https://source.unsplash.com/1200x700/?leh,ladakh,india",
-    "ladakh": "https://source.unsplash.com/1200x700/?ladakh,india,mountains",
-    "srinagar": "https://source.unsplash.com/1200x700/?srinagar,kashmir,india",
-    "jammu": "https://source.unsplash.com/1200x700/?jammu,india,city",
-    "udaipur": "https://source.unsplash.com/1200x700/?udaipur,india,lake-palace",
-    "jodhpur": "https://source.unsplash.com/1200x700/?jodhpur,india,mehrangarh-fort",
-    "pushkar": "https://source.unsplash.com/1200x700/?pushkar,rajasthan,india",
-    "kochi": "https://source.unsplash.com/1200x700/?kochi,kerala,india",
-    "munnar": "https://source.unsplash.com/1200x700/?munnar,kerala,tea-estates",
-    "alleppey": "https://source.unsplash.com/1200x700/?alleppey,kerala,backwaters",
-    "thiruvananthapuram": "https://source.unsplash.com/1200x700/?thiruvananthapuram,kerala,india",
-    "mysore": "https://source.unsplash.com/1200x700/?mysore,palace,india",
-    "coorg": "https://source.unsplash.com/1200x700/?coorg,karnataka,india",
-    "ooty": "https://source.unsplash.com/1200x700/?ooty,tamil-nadu,india",
-    "madurai": "https://source.unsplash.com/1200x700/?madurai,meenakshi-temple,india",
-    "vishakhapatnam": "https://source.unsplash.com/1200x700/?visakhapatnam,india,beach",
-    "vizag": "https://source.unsplash.com/1200x700/?visakhapatnam,india,beach",
-    "bhubaneswar": "https://source.unsplash.com/1200x700/?bhubaneswar,odisha,india",
-    "puri": "https://source.unsplash.com/1200x700/?puri,jagannath,india",
-    "gangtok": "https://source.unsplash.com/1200x700/?gangtok,sikkim,india",
-    "darjeeling": "https://source.unsplash.com/1200x700/?darjeeling,india,hills",
-    "andaman": "https://source.unsplash.com/1200x700/?andaman,india,islands",
-    "port blair": "https://source.unsplash.com/1200x700/?port-blair,andaman,india",
+    "bangalore": "https://images.unsplash.com/photo-1596422846543-b5c64881fe53?auto=format&fit=crop&w=1200&q=80",
+    "bengaluru": "https://images.unsplash.com/photo-1596422846543-b5c64881fe53?auto=format&fit=crop&w=1200&q=80",
+    "hyderabad": "https://images.unsplash.com/photo-1605333396915-47ed6b68a00e?auto=format&fit=crop&w=1200&q=80",
+    "chennai": "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1200&q=80",
+    "kolkata": "https://images.unsplash.com/photo-1558434088-918448995a1b?auto=format&fit=crop&w=1200&q=80",
+    "pune": "https://images.unsplash.com/photo-1543831306-25838031da29?auto=format&fit=crop&w=1200&q=80",
+    "ahmedabad": "https://images.unsplash.com/photo-1634563811652-32a2656360c7?auto=format&fit=crop&w=1200&q=80",
+    "surat": "https://images.unsplash.com/photo-1634563811652-32a2656360c7?auto=format&fit=crop&w=1200&q=80",
+    "lucknow": "https://images.unsplash.com/photo-1563840746-996489370041?auto=format&fit=crop&w=1200&q=80",
+    "amritsar": "https://images.unsplash.com/photo-1623594132030-cf2ba270a68d?auto=format&fit=crop&w=1200&q=80",
+    "varanasi": "https://images.unsplash.com/photo-1561361513-2d000a501012?auto=format&fit=crop&w=1200&q=80",
+    "agra": "https://images.unsplash.com/photo-1564507592333-c60657451dd6?auto=format&fit=crop&w=1200&q=80",
+    "rishikesh": "https://images.unsplash.com/photo-1533604117777-62463e264264?auto=format&fit=crop&w=1200&q=80",
+    "haridwar": "https://images.unsplash.com/photo-1533604117777-62463e264264?auto=format&fit=crop&w=1200&q=80",
+    "shimla": "https://images.unsplash.com/photo-1624504192663-8a39e83ec50f?auto=format&fit=crop&w=1200&q=80",
+    "dharamshala": "https://images.unsplash.com/photo-1583279177196-8ac54191ae0b?auto=format&fit=crop&w=1200&q=80",
+    "leh": "https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?auto=format&fit=crop&w=1200&q=80",
+    "ladakh": "https://images.unsplash.com/photo-1581793745862-99fde7fa73d2?auto=format&fit=crop&w=1200&q=80",
+    "srinagar": "https://images.unsplash.com/photo-1566833925222-38617f7d0bd7?auto=format&fit=crop&w=1200&q=80",
+    "jammu": "https://images.unsplash.com/photo-1566833925222-38617f7d0bd7?auto=format&fit=crop&w=1200&q=80",
+    "udaipur": "https://images.unsplash.com/photo-1639352220147-38f36cb077d8?auto=format&fit=crop&w=1200&q=80",
+    "jodhpur": "https://images.unsplash.com/photo-1639352220147-38f36cb077d8?auto=format&fit=crop&w=1200&q=80",
+    "pushkar": "https://images.unsplash.com/photo-1596422846543-b5c64881fe53?auto=format&fit=crop&w=1200&q=80",
+    "kochi": "https://images.unsplash.com/photo-1561360064-96696dbd4c9d?auto=format&fit=crop&w=1200&q=80",
+    "munnar": "https://images.unsplash.com/photo-1561360064-96696dbd4c9d?auto=format&fit=crop&w=1200&q=80",
+    "alleppey": "https://images.unsplash.com/photo-1561360064-96696dbd4c9d?auto=format&fit=crop&w=1200&q=80",
+    "thiruvananthapuram": "https://images.unsplash.com/photo-1561360064-96696dbd4c9d?auto=format&fit=crop&w=1200&q=80",
+    "mysore": "https://images.unsplash.com/photo-1596422846543-b5c64881fe53?auto=format&fit=crop&w=1200&q=80",
+    "coorg": "https://images.unsplash.com/photo-1596422846543-b5c64881fe53?auto=format&fit=crop&w=1200&q=80",
+    "ooty": "https://images.unsplash.com/photo-1596422846543-b5c64881fe53?auto=format&fit=crop&w=1200&q=80",
+    "madurai": "https://images.unsplash.com/photo-1596422846543-b5c64881fe53?auto=format&fit=crop&w=1200&q=80",
+    "vishakhapatnam": "https://images.unsplash.com/photo-1561360064-96696dbd4c9d?auto=format&fit=crop&w=1200&q=80",
+    "vizag": "https://images.unsplash.com/photo-1561360064-96696dbd4c9d?auto=format&fit=crop&w=1200&q=80",
+    "bhubaneswar": "https://images.unsplash.com/photo-1558434088-918448995a1b?auto=format&fit=crop&w=1200&q=80",
+    "puri": "https://images.unsplash.com/photo-1558434088-918448995a1b?auto=format&fit=crop&w=1200&q=80",
+    "gangtok": "https://images.unsplash.com/photo-1558434088-918448995a1b?auto=format&fit=crop&w=1200&q=80",
+    "darjeeling": "https://images.unsplash.com/photo-1558434088-918448995a1b?auto=format&fit=crop&w=1200&q=80",
+    "andaman": "https://images.unsplash.com/photo-1561360064-96696dbd4c9d?auto=format&fit=crop&w=1200&q=80",
+    "port blair": "https://images.unsplash.com/photo-1561360064-96696dbd4c9d?auto=format&fit=crop&w=1200&q=80",
 }
 
 PREFERENCE_QUERY_TERMS = {
@@ -266,7 +267,7 @@ def destination_image_url(
             f"?size=1200x700&location={quote_plus(query)}&key={quote_plus(google_places_api_key)}"
         )
 
-    return f"https://source.unsplash.com/1200x700/?{quote_plus(query + ' travel destination')}"
+    return f"https://loremflickr.com/1200/700/{quote_plus(query + ' travel destination')}"
 
 
 def build_destination_cards(
@@ -330,6 +331,7 @@ def _text_search_payload(query: str, api_key: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+@api_cache.memoize(key_prefix="osm_search", expiry_seconds=604800)
 def _osm_search(query: str, limit: int = 15) -> list[dict]:
     params = urlencode(
         {
@@ -348,6 +350,7 @@ def _osm_search(query: str, limit: int = 15) -> list[dict]:
     return []
 
 
+@api_cache.memoize(key_prefix="openmeteo_coords", expiry_seconds=604800)
 def _openmeteo_coords(query: str) -> tuple[float, float] | None:
     params = urlencode({"name": query, "count": 1, "language": "en", "format": "json"})
     data = _fetch_json(f"https://geocoding-api.open-meteo.com/v1/search?{params}")
@@ -396,6 +399,7 @@ def _resolve_destination_coords(destination: str, destination_query: str) -> tup
     return _openmeteo_coords(destination) or _openmeteo_coords(destination_query)
 
 
+@api_cache.memoize(key_prefix="google_geocode", expiry_seconds=604800)
 def _geocode_query(query: str, api_key: str) -> tuple[float, float] | None:
     params = urlencode({"address": query, "key": api_key})
     data = _fetch_json(f"https://maps.googleapis.com/maps/api/geocode/json?{params}")
@@ -598,6 +602,7 @@ def _build_google_places_activity_rows(
     return rows_out
 
 
+@api_cache.memoize(key_prefix="destination_activities", expiry_seconds=43200)
 def fetch_live_destination_activities(
     destination: str,
     state_country: str | None = None,
@@ -605,7 +610,7 @@ def fetch_live_destination_activities(
     places_api_key: str | None = None,
     gemini_api_key: str | None = None,
     limit: int = 18,
-    model: str = "gemini-3-flash-preview",
+    model: str = "gemini-flash-latest",
 ) -> list[dict]:
     normalized_prefs = [(p or "").strip().lower() for p in (preferences or []) if (p or "").strip()]
     if not normalized_prefs:
@@ -1059,23 +1064,24 @@ def _fetch_google_places_hotels(
     return hotels
 
 
+@api_cache.memoize(key_prefix="live_hotels", expiry_seconds=86400)
 def fetch_live_hotels(
-    destination: str,
+    city: str,
     state_country: str | None = None,
     api_key: str | None = None,
     places_api_key: str | None = None,
-    limit: int = 10,
-    model: str = "gemini-3-flash-preview",
+    model: str = "gemini-flash-latest",
+    limit: int = 15,
     provider: str = "rapidapi",
     rapidapi_key: str | None = None,
-    rapidapi_host: str = "booking-com.p.rapidapi.com",
-    rapidapi_locale: str = "en-us",
-    rapidapi_currency: str = "INR",
+    rapidapi_host: str | None = None,
+    rapidapi_locale: str | None = None,
+    rapidapi_currency: str | None = "INR",
     rapidapi_timeout: int = 15,
     checkin_date: str | None = None,
     checkout_date: str | None = None,
 ) -> list[dict]:
-    destination_query = _build_query(destination, state_country)
+    destination_query = _build_query(city, state_country)
     hotels: list[dict] = []
     seen_names: set[str] = set()
 
@@ -1105,7 +1111,7 @@ def fetch_live_hotels(
         hotels.append(
             {
                 "name": name,
-                "city": destination,
+                "city": city,
                 "address": address,
                 "price_min": round(price_min, 2),
                 "price_max": round(price_max, 2),
@@ -1120,7 +1126,7 @@ def fetch_live_hotels(
     if provider == "rapidapi" and rapidapi_key:
         try:
             rapid_rows = _fetch_rapidapi_hotels(
-                destination=destination,
+                destination=city,
                 destination_query=destination_query,
                 rapidapi_key=rapidapi_key,
                 rapidapi_host=rapidapi_host,
@@ -1143,7 +1149,7 @@ def fetch_live_hotels(
         remaining = max(3, limit - len(hotels))
         prompt = (
             "You are a travel data API. Return only JSON array with no markdown.\n"
-            f"Generate exactly {remaining} hotel recommendations for destination: {destination_query}.\n"
+            f"Provide {remaining} high-quality hotel recommendations for the city of '{city}' in '{state_country}'.\n"
             "Each item must include keys: name, address, rating, price_min_inr, price_max_inr, distance_km.\n"
             "Rules: hotels must belong to destination city/region; rating between 3.5 and 5.0; "
             "price_max_inr >= price_min_inr; distance_km numeric."
@@ -1191,7 +1197,7 @@ def fetch_live_hotels(
     if places_api_key and len(hotels) < limit:
         try:
             gp_rows = _fetch_google_places_hotels(
-                destination=destination,
+                destination=city,
                 destination_query=destination_query,
                 places_api_key=places_api_key,
                 limit=max(10, limit),
@@ -1209,9 +1215,9 @@ def fetch_live_hotels(
             display_name = str(row.get("display_name", "")).strip()
             if not display_name:
                 continue
-            if not _contains_destination(display_name, destination):
+            if not _contains_destination(display_name, city):
                 continue
-            name = (display_name.split(",")[0] or "").strip() or f"{destination} Hotel"
+            name = (display_name.split(",")[0] or "").strip() or f"{city} Hotel"
             est_min, est_max = estimate_hotel_price_range(None, 4.1)
             _append_hotel(
                 {
@@ -1232,7 +1238,7 @@ def fetch_live_hotels(
         for idx in range(limit - len(hotels)):
             rating = 4.1 + (idx % 3) * 0.1
             est_min, est_max = estimate_hotel_price_range(None, rating)
-            name = f"{destination} Stay {len(hotels) + 1}"
+            name = f"{city} Stay {len(hotels) + 1}"
             _append_hotel(
                 {
                     "name": name,

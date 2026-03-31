@@ -23,6 +23,8 @@ class Config:
     BASE_DIR = Path(__file__).resolve().parent.parent
     INSTANCE_DIR = BASE_DIR / "instance"
     SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production")
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, "app", "static", "uploads", "payments")
+    ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
     _RAW_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///instance/air_trip_planner.db")
     if _RAW_DATABASE_URL.startswith("sqlite:///") and not _RAW_DATABASE_URL.startswith("sqlite:////"):
         _sqlite_rel_path = _RAW_DATABASE_URL.replace("sqlite:///", "", 1)
@@ -51,7 +53,7 @@ class Config:
     GOOGLE_GEMINI_AI_API_KEY = _clean_env_value(os.getenv("GOOGLE_GEMINI_AI_API_KEY")) or _clean_env_value(
         os.getenv("VITE_GOOGLE_GEMINI_AI_API_KEY")
     )
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
     GOOGLE_AUTH_CLIENT_ID = _clean_env_value(os.getenv("GOOGLE_AUTH_CLIENT_ID")) or _clean_env_value(
         os.getenv("VITE_GOOGLE_AUTH_CLIENT_ID")
     )

@@ -8,17 +8,7 @@
             <div class="card-body p-4">
                 <h3 class="mb-3">Create Trip for Client</h3>
                 <form method="post" action="{{ url_for('agent.create_trip') }}" id="trip-form">
-                    <div class="row g-3 mb-1">
-                        <div class="col-md-6">
-                            <label class="form-label">Traveler Account</label>
-                            <select class="form-select" name="traveler_id" required>
-                                <option value="">Select traveler</option>
-                                {% for traveler in all_travelers %}
-                                    <option value="{{ traveler.id }}">{{ traveler.full_name }} ({{ traveler.email }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
+
                     {% set include_client = True %}
                     {% include "partials/trip_form_fields.html" %}
                     <div class="mt-4 d-grid d-md-flex justify-content-md-end">

@@ -11,10 +11,6 @@ main_bp = Blueprint("main", __name__)
 
 @main_bp.route("/")
 def index():
-    if current_user.is_authenticated:
-        if current_user.role == "agent":
-            return redirect(url_for("agent.dashboard"))
-        return redirect(url_for("traveler.dashboard"))
     return render_template("index.html")
 
 
@@ -42,7 +38,7 @@ def chatbot():
         question = request.form.get("question", "").strip()
         if question:
             api_key = current_app.config.get("GOOGLE_GEMINI_AI_API_KEY")
-            model = current_app.config.get("GEMINI_MODEL", "gemini-2.5-flash")
+            model = current_app.config.get("GEMINI_MODEL", "gemini-flash-latest")
             if api_key:
                 prompt = (
                     "You are the assistant for AI AIR TRIP PLANNER.\n"
@@ -71,18 +67,6 @@ def chatbot():
             if not answer:
                 answer = _local_chatbot_fallback(question)
     return render_template("chatbot.html", question=question, answer=answer)
-
-
-@main_bp.route("/checklist")
-@login_required
-def checklist():
-    return render_template("checklist.html")
-
-
-@main_bp.route("/study")
-@login_required
-def study():
-    return render_template("study.html")
 
 
 @main_bp.route("/docs/<string:name>")

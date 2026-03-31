@@ -27,14 +27,10 @@
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('traveler.create_trip') }}"><i class="bi bi-plus-circle me-1"></i>Create Trip</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('traveler.my_trips') }}"><i class="bi bi-briefcase me-1"></i>My Trips</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('main.chatbot') }}"><i class="bi bi-chat-dots me-1"></i>Chatbot</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.study') }}"><i class="bi bi-journal-text me-1"></i>Study</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.checklist') }}"><i class="bi bi-card-checklist me-1"></i>Check List</a></li>
                 {% elif current_user.is_authenticated and current_user.role == 'agent' %}
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('agent.dashboard') }}"><i class="bi bi-kanban me-1"></i>Agent Panel</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('agent.create_trip') }}"><i class="bi bi-person-vcard me-1"></i>Create Client Trip</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('main.chatbot') }}"><i class="bi bi-chat-dots me-1"></i>Chatbot</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.study') }}"><i class="bi bi-journal-text me-1"></i>Study</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url_for('main.checklist') }}"><i class="bi bi-card-checklist me-1"></i>Check List</a></li>
                 {% endif %}
 
                 {% if current_user.is_authenticated %}

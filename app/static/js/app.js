@@ -62,8 +62,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     input.value = text.trim();
                 }
             };
-            recognition.onerror = () => {
-                alert("Unable to capture speech. Please try again.");
+            recognition.onerror = (event) => {
+                if (event.error === 'not-allowed') {
+                    alert("Microphone access denied. Please allow microphone permissions in your browser settings.");
+                } else if (event.error === 'no-speech') {
+                    alert("No speech detected. Please speak clearly and try again.");
+                } else if (event.error === 'network') {
+                    alert("Network error occurred during speech recognition. Please check your connection.");
+                } else {
+                    alert(`Speech recognition error (${event.error}). Please try again.`);
+                }
             };
             recognition.onend = () => {
                 button.disabled = false;
@@ -90,8 +98,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!address) {
             return "";
         }
+        // Prioritize larger administrative areas: city > district > town > suburb > county > village > state > country
         return sanitizeLocationText(
-            address.city || address.town || address.village || address.suburb || address.county || address.state || address.country || ""
+            address.city || address.state_district || address.county || address.town || address.suburb || address.village || address.state || address.country || ""
         );
     };
 
@@ -157,6 +166,41 @@ document.addEventListener("DOMContentLoaded", () => {
         return Array.isArray(data?.results) ? data.results : [];
     };
 
+    const fetchDestinationCountry = async (cityName, hint = "") => {
+        try {
+            const query = hint ? `${cityName}, ${hint}` : cityName;
+            const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+            const resp = await fetch(url);
+            if (!resp.ok) return null;
+            const data = await resp.json();
+            const results = Array.isArray(data?.results) ? data.results : [];
+            return results.length > 0 ? (results[0].country_code || null) : null;
+        } catch (_) {
+            return null;
+        }
+    };
+
+    const checkDestinationCountries = async (destinations, hint = "") => {
+        if (destinations.length <= 1) return { ok: true };
+        const countryMap = {};
+        await Promise.all(
+            destinations.map(async (dest) => {
+                const primary = dest.split(",")[0].trim();
+                const code = await fetchDestinationCountry(primary, hint);
+                if (code) countryMap[primary] = code.toUpperCase();
+            })
+        );
+        const uniqueCountries = new Set(Object.values(countryMap));
+        if (uniqueCountries.size <= 1) return { ok: true };
+        const detail = Object.entries(countryMap)
+            .map(([city, code]) => `${city} (${code})`)
+            .join(", ");
+        return {
+            ok: false,
+            message: `All destinations must be in the same country.\nFound: ${detail}.\nPlease plan separate trips for each country.`,
+        };
+    };
+
     const attachPlaceAutocomplete = (inputSelector, datalistSelector, toSuggestion) => {
         const input = document.querySelector(inputSelector);
         const datalist = document.querySelector(datalistSelector);
@@ -185,9 +229,76 @@ document.addEventListener("DOMContentLoaded", () => {
         input.addEventListener("input", onInputDebounced);
     };
 
-    attachPlaceAutocomplete("#fromLocationInput", "#fromLocationSuggestions", (item) => {
-        return item?.name || "";
-    });
+    // Enhanced from-location autocomplete: also stores geocoding metadata to auto-fill State/Country
+    const fromLocationInput = document.querySelector("#fromLocationInput");
+    const fromLocationDatalist = document.querySelector("#fromLocationSuggestions");
+    const stateCountryInput = document.querySelector("#stateCountryInput");
+
+    if (fromLocationInput && fromLocationDatalist) {
+        // Map from suggestion label → geocoding result for auto-fill
+        const geoResultMap = new Map();
+
+        const onFromInputDebounced = debounce(async () => {
+            const query = (fromLocationInput.value || "").trim();
+            if (query.length < 2) {
+                setDatalistOptions(fromLocationDatalist, []);
+                geoResultMap.clear();
+                return;
+            }
+            try {
+                const results = await fetchGeoSuggestions(query);
+                geoResultMap.clear();
+                const options = [];
+                results.forEach((item) => {
+                    const cityName = sanitizeLocationText(item?.name || "");
+                    if (!cityName) return;
+                    // Build a display label: "CityName, Country"
+                    const country = sanitizeLocationText(item?.country || "");
+                    const admin = sanitizeLocationText(item?.admin1 || item?.admin2 || "");
+                    const label = country ? `${cityName}, ${country}` : cityName;
+                    if (!geoResultMap.has(label)) {
+                        geoResultMap.set(label, { cityName, admin, country });
+                        options.push(label);
+                    }
+                });
+                setDatalistOptions(fromLocationDatalist, options.slice(0, 8));
+            } catch (_error) {
+                setDatalistOptions(fromLocationDatalist, []);
+            }
+        }, 260);
+
+        fromLocationInput.addEventListener("input", onFromInputDebounced);
+
+        // When user finishes selecting / leaves the field, auto-fill state/country
+        const applyAutoFill = () => {
+            const selected = (fromLocationInput.value || "").trim();
+            const meta = geoResultMap.get(selected);
+            if (meta) {
+                if (stateCountryInput && !stateCountryInput.value.trim()) {
+                    const parts = [meta.admin, meta.country].filter(Boolean);
+                    if (parts.length) {
+                        stateCountryInput.value = parts.join(", ");
+                    }
+                }
+                fromLocationInput.value = meta.cityName;
+            }
+            // Also try partial match (user typed city name without country)
+            if (!meta && stateCountryInput && !stateCountryInput.value.trim()) {
+                for (const [label, mdata] of geoResultMap.entries()) {
+                    if (label.toLowerCase().startsWith(selected.toLowerCase())) {
+                        const parts = [mdata.admin, mdata.country].filter(Boolean);
+                        if (parts.length) {
+                            stateCountryInput.value = parts.join(", ");
+                        }
+                        break;
+                    }
+                }
+            }
+        };
+
+        fromLocationInput.addEventListener("change", applyAutoFill);
+        fromLocationInput.addEventListener("blur", applyAutoFill);
+    }
 
     attachPlaceAutocomplete("#stateCountryInput", "#stateCountrySuggestions", (item) => {
         const admin = item?.admin1 || item?.admin2 || "";
@@ -292,52 +403,124 @@ document.addEventListener("DOMContentLoaded", () => {
             startDateInput.min = today;
         }
 
-        tripForm.addEventListener("submit", (event) => {
+        tripForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
             const destinationsInput = tripForm.querySelector('textarea[name="destinations"]');
             if (!destinationsInput || !destinationsInput.value.trim()) {
-                event.preventDefault();
                 alert("Please add at least one destination.");
                 return;
             }
 
-            const destinations = destinationsInput.value
+            const rawDestinations = destinationsInput.value
                 .split(/[,\n]/)
                 .map((item) => item.trim())
                 .filter(Boolean);
+
+            const destinations = [];
+            const seenDests = new Set();
+            rawDestinations.forEach(d => {
+                const lower = d.toLowerCase();
+                if (!seenDests.has(lower)) {
+                    seenDests.add(lower);
+                    destinations.push(d);
+                }
+            });
 
             const fromLocation = (tripForm.querySelector('input[name="from_location"]')?.value || "").trim();
             const stateCountry = (tripForm.querySelector('input[name="state_country"]')?.value || "").trim();
             const daysValue = Number(tripForm.querySelector('input[name="number_of_days"]')?.value || 0);
 
             if (!locationPattern.test(fromLocation)) {
-                event.preventDefault();
                 alert("From Location must be a valid place name (letters only).");
                 return;
             }
 
             if (!locationPattern.test(stateCountry)) {
-                event.preventDefault();
                 alert("State/Country must be a valid place name (letters only).");
                 return;
             }
 
             const invalidDestination = destinations.find((name) => !locationPattern.test(name));
             if (invalidDestination) {
-                event.preventDefault();
                 alert(`Destination '${invalidDestination}' is invalid. Use place names only.`);
                 return;
             }
 
             if (daysValue > 0 && destinations.length > daysValue) {
-                event.preventDefault();
                 alert("Number of days must be at least equal to destination count.");
                 return;
             }
 
             if (destinations.length > 8) {
-                event.preventDefault();
                 alert("Please keep destinations to 8 or fewer for better plans.");
+                return;
+            }
+
+            // Cross-country check (async geocoding)
+            const submitBtn = tripForm.querySelector('[type="submit"]');
+            const originalLabel = submitBtn ? submitBtn.innerHTML : null;
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Validating destinations...';
+            }
+            try {
+                const countryCheck = await checkDestinationCountries(destinations, stateCountry);
+                if (!countryCheck.ok) {
+                    alert(countryCheck.message);
+                    return;
+                }
+            } finally {
+                if (submitBtn && originalLabel !== null) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalLabel;
+                }
+            }
+
+            tripForm.submit();
+        });
+    }
+
+    const initPhoneInputs = () => {
+        document.querySelectorAll(".phone-input-group").forEach((group) => {
+            const fieldId = group.getAttribute("data-field-id");
+            if (!fieldId) return;
+
+            const dialCodeEl = document.getElementById(`${fieldId}Code`);
+            const numberInpEl = document.getElementById(`${fieldId}Number`);
+            const hiddenInpEl = document.getElementById(`${fieldId}Hidden`);
+
+            if (!dialCodeEl || !numberInpEl || !hiddenInpEl) return;
+
+            const updateHidden = () => {
+                let num = (numberInpEl.value || "").replace(/\D/g, "");
+                if (num.startsWith("0")) {
+                    num = num.substring(1);
+                }
+                hiddenInpEl.value = num ? `${dialCodeEl.value}${num}` : "";
+            };
+
+            dialCodeEl.addEventListener("change", updateHidden);
+            numberInpEl.addEventListener("input", updateHidden);
+
+            updateHidden();
+        });
+    };
+
+    const peopleCountInput = document.getElementById("peopleCountInput");
+    const travelTypeSelect = document.getElementById("travelTypeSelect");
+    if (peopleCountInput && travelTypeSelect) {
+        peopleCountInput.addEventListener("input", () => {
+            const count = parseInt(peopleCountInput.value) || 1;
+            if (count === 1) {
+                travelTypeSelect.value = "solo";
+            } else if (count === 2) {
+                travelTypeSelect.value = "couple";
+            } else if (count > 2) {
+                travelTypeSelect.value = "family";
             }
         });
     }
+
+    initPhoneInputs();
 });

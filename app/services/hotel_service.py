@@ -1,3 +1,4 @@
+import concurrent.futures
 from flask import current_app
 from sqlalchemy import func
 from types import SimpleNamespace
@@ -6,6 +7,11 @@ import math
 from app.extensions import db
 from app.models import Hotel
 from app.services.place_service import fetch_live_hotels
+
+
+def run_in_context(app, func, *args, **kwargs):
+    with app.app_context():
+        return func(*args, **kwargs)
 
 
 def _upsert_live_hotel(hotel_data: dict) -> Hotel:
@@ -134,7 +140,7 @@ def recommended_hotels(
     provider = current_app.config.get("HOTEL_PROVIDER", "rapidapi")
     gemini_api_key = current_app.config.get("GOOGLE_GEMINI_AI_API_KEY")
     places_api_key = current_app.config.get("GOOGLE_PLACES_API_KEY")
-    gemini_model = current_app.config.get("GEMINI_MODEL", "gemini-3-flash-preview")
+    gemini_model = current_app.config.get("GEMINI_MODEL", "gemini-flash-latest")
     rapidapi_key = current_app.config.get("RAPIDAPI_KEY")
     rapidapi_host = current_app.config.get("RAPIDAPI_HOST", "booking-com.p.rapidapi.com")
     rapidapi_locale = current_app.config.get("RAPIDAPI_LOCALE", "en-us")
@@ -142,30 +148,40 @@ def recommended_hotels(
     rapidapi_timeout = int(current_app.config.get("RAPIDAPI_TIMEOUT_SECONDS", 15) or 15)
     pools_by_city: dict[str, list] = {}
 
-    for city in city_list:
-        city_hotels = []
-        live_rows = fetch_live_hotels(
-            city,
-            state_country=state_country,
-            api_key=gemini_api_key,
-            places_api_key=places_api_key,
-            model=gemini_model,
-            limit=fetch_limit,
-            provider=provider,
-            rapidapi_key=rapidapi_key,
-            rapidapi_host=rapidapi_host,
-            rapidapi_locale=rapidapi_locale,
-            rapidapi_currency=rapidapi_currency,
-            rapidapi_timeout=rapidapi_timeout,
-            checkin_date=checkin_date,
-            checkout_date=checkout_date,
-        )
-        for row in live_rows:
-            hotel = _upsert_live_hotel(row) if persist else _to_hotel_like(row)
-            setattr(hotel, "availability_status", row.get("availability_status", "Live status unavailable"))
-            setattr(hotel, "rooms_available", row.get("rooms_available"))
-            city_hotels.append(hotel)
-        pools_by_city[city.lower()] = city_hotels
+    app = current_app._get_current_object()
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, len(city_list))) as executor:
+        futures = {}
+        for city in city_list:
+            futures[city] = executor.submit(
+                run_in_context,
+                app,
+                fetch_live_hotels,
+                city,
+                state_country=state_country,
+                api_key=gemini_api_key,
+                places_api_key=places_api_key,
+                model=gemini_model,
+                limit=fetch_limit,
+                provider=provider,
+                rapidapi_key=rapidapi_key,
+                rapidapi_host=rapidapi_host,
+                rapidapi_locale=rapidapi_locale,
+                rapidapi_currency=rapidapi_currency,
+                rapidapi_timeout=rapidapi_timeout,
+                checkin_date=checkin_date,
+                checkout_date=checkout_date,
+            )
+            
+        for city, future in futures.items():
+            city_hotels = []
+            live_rows = future.result()
+            for row in live_rows:
+                hotel = _upsert_live_hotel(row) if persist else _to_hotel_like(row)
+                setattr(hotel, "availability_status", row.get("availability_status", "Live status unavailable"))
+                setattr(hotel, "rooms_available", row.get("rooms_available"))
+                city_hotels.append(hotel)
+            pools_by_city[city.lower()] = city_hotels
 
     if any(pools_by_city.values()):
         # Top up each destination from DB cache if live provider returned fewer hotels for that city.
@@ -230,7 +246,7 @@ def get_live_hotel_availability(
     provider = current_app.config.get("HOTEL_PROVIDER", "rapidapi")
     gemini_api_key = current_app.config.get("GOOGLE_GEMINI_AI_API_KEY")
     places_api_key = current_app.config.get("GOOGLE_PLACES_API_KEY")
-    gemini_model = current_app.config.get("GEMINI_MODEL", "gemini-3-flash-preview")
+    gemini_model = current_app.config.get("GEMINI_MODEL", "gemini-flash-latest")
     rapidapi_key = current_app.config.get("RAPIDAPI_KEY")
     rapidapi_host = current_app.config.get("RAPIDAPI_HOST", "booking-com.p.rapidapi.com")
     rapidapi_locale = current_app.config.get("RAPIDAPI_LOCALE", "en-us")

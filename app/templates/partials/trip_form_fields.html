@@ -5,8 +5,8 @@
     {% if include_client %}
     <div class="col-md-6">
         <label class="form-label">Client</label>
-        <select class="form-select" name="client_id">
-            <option value="">Select client (optional)</option>
+        <select class="form-select" name="client_id" required>
+            <option value="">Select client</option>
             {% for client in clients %}
                 <option value="{{ client.id }}">{{ client.full_name }}</option>
             {% endfor %}
@@ -32,9 +32,6 @@
         <label class="form-label"><i class="bi bi-send me-1"></i>From Location</label>
         <div class="input-group">
             <input id="fromLocationInput" list="fromLocationSuggestions" class="form-control" type="text" name="from_location" pattern="^[A-Za-z][A-Za-z\\s,.'-]{1,118}$" title="Enter a valid place name (letters only)." required>
-            <button class="btn btn-outline-secondary speech-fill" type="button" data-target="fromLocationInput" data-mode="replace" title="Speak from location">
-                <i class="bi bi-mic"></i>
-            </button>
             <button class="btn btn-outline-secondary use-current-location" type="button">
                 <i class="bi bi-crosshair me-1"></i>Use My Current Location
             </button>
@@ -50,12 +47,7 @@
 
     <div class="col-12">
         <label class="form-label"><i class="bi bi-map-fill me-1"></i>Destination(s) - comma separated</label>
-        <div class="input-group">
-            <textarea id="destinationsInput" class="form-control" name="destinations" rows="2" placeholder="Mumbai, Goa, Jaipur" required></textarea>
-            <button class="btn btn-outline-secondary speech-fill" type="button" data-target="destinationsInput" data-mode="append" title="Speak destination list">
-                <i class="bi bi-mic"></i>
-            </button>
-        </div>
+        <textarea id="destinationsInput" class="form-control" name="destinations" rows="2" placeholder="Mumbai, Goa, Jaipur" required></textarea>
     </div>
 
     <div class="col-md-4">
@@ -68,7 +60,7 @@
     </div>
     <div class="col-md-4">
         <label class="form-label"><i class="bi bi-people-fill me-1"></i>Number of People</label>
-        <input class="form-control" type="number" min="1" name="number_of_people" required>
+        <input id="peopleCountInput" class="form-control" type="number" min="1" name="number_of_people" required>
     </div>
 
     <div class="col-md-4">
@@ -85,7 +77,7 @@
     </div>
     <div class="col-md-4">
         <label class="form-label"><i class="bi bi-person-hearts me-1"></i>Travel Type</label>
-        <select class="form-select" name="travel_type" required>
+        <select id="travelTypeSelect" class="form-select" name="travel_type" required>
             {% for ttype in travel_types %}
                 <option value="{{ ttype }}">{{ ttype|title }}</option>
             {% endfor %}

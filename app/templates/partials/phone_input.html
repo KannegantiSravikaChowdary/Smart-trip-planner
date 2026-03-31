@@ -1,0 +1,91 @@
+{% macro phone_input(field_id, label, existing_value='', required=True, form_attr='', size='') %}
+{#
+  Renders a country-code selector + phone number input.
+  The dial code and number are merged into a hidden `phone` field just before form submit
+  by the initPhoneInputs() function in app.js.
+
+  Args:
+    field_id       – unique id base (e.g. "registerPhone")
+    label          – label text shown above the field
+    existing_value – pre-filled full phone string like "+919876543210"
+    required       – whether the number input is required
+    form_attr      – value for the HTML `form` attribute (used in table-row forms)
+    size           – "sm" for compact variant, else ""
+#}
+{% set ctrl_class = "form-control form-control-sm" if size == "sm" else "form-control" %}
+{% set sel_class  = "form-select form-select-sm" if size == "sm" else "form-select" %}
+{% if label %}
+<label class="form-label">{{ label }}</label>
+{% endif %}
+<div class="input-group phone-input-group" data-field-id="{{ field_id }}">
+    <select
+        id="{{ field_id }}Code"
+        class="{{ sel_class }} phone-dial-select"
+        style="max-width:9rem"
+        aria-label="Country code"
+        {% if form_attr %}form="{{ form_attr }}"{% endif %}
+    >
+        <option value="+91"  selected>🇮🇳 +91</option>
+        <option value="+1"  >🇺🇸 +1</option>
+        <option value="+44" >🇬🇧 +44</option>
+        <option value="+61" >🇦🇺 +61</option>
+        <option value="+971">🇦🇪 +971</option>
+        <option value="+65" >🇸🇬 +65</option>
+        <option value="+60" >🇲🇾 +60</option>
+        <option value="+66" >🇹🇭 +66</option>
+        <option value="+81" >🇯🇵 +81</option>
+        <option value="+82" >🇰🇷 +82</option>
+        <option value="+86" >🇨🇳 +86</option>
+        <option value="+49" >🇩🇪 +49</option>
+        <option value="+33" >🇫🇷 +33</option>
+        <option value="+39" >🇮🇹 +39</option>
+        <option value="+34" >🇪🇸 +34</option>
+        <option value="+55" >🇧🇷 +55</option>
+        <option value="+27" >🇿🇦 +27</option>
+        <option value="+20" >🇪🇬 +20</option>
+        <option value="+234">🇳🇬 +234</option>
+        <option value="+92" >🇵🇰 +92</option>
+        <option value="+880">🇧🇩 +880</option>
+        <option value="+94" >🇱🇰 +94</option>
+        <option value="+977">🇳🇵 +977</option>
+    </select>
+    <input
+        id="{{ field_id }}Number"
+        type="tel"
+        class="{{ ctrl_class }} phone-number-input"
+        placeholder="9876543210"
+        maxlength="10"
+        pattern="\d{10}"
+        oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10)"
+        {% if required %}required{% endif %}
+        {% if form_attr %}form="{{ form_attr }}"{% endif %}
+    >
+    {# Hidden field carries the final merged dial-code + number to the server #}
+    <input
+        type="hidden"
+        name="phone"
+        id="{{ field_id }}Hidden"
+        {% if form_attr %}form="{{ form_attr }}"{% endif %}
+    >
+</div>
+{% if existing_value %}
+<script>
+(function () {
+    var stored  = {{ existing_value | tojson }};
+    var dialSel = document.getElementById('{{ field_id }}Code');
+    var numInp  = document.getElementById('{{ field_id }}Number');
+    if (!stored || !dialSel || !numInp) return;
+    var raw = stored.charAt(0) === '+' ? stored : '+' + stored;
+    var codes = Array.from(dialSel.options).map(function(o){ return o.value; })
+                    .sort(function(a,b){ return b.length - a.length; });
+    for (var i = 0; i < codes.length; i++) {
+        if (raw.startsWith(codes[i])) {
+            dialSel.value = codes[i];
+            numInp.value  = raw.slice(codes[i].length).replace(/^0+/, '');
+            break;
+        }
+    }
+})();
+</script>
+{% endif %}
+{% endmacro %}

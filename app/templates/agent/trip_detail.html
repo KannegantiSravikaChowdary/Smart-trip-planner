@@ -11,24 +11,12 @@
                 <p class="mb-0">Client: {{ trip.client.full_name if trip.client else 'Direct traveler' }}</p>
                 <p class="mb-0">Traveler Account: {{ trip.traveler.full_name if trip.traveler else 'Not linked' }}</p>
             </div>
-            {% set can_send_traveler_whatsapp = trip.traveler and trip.traveler.phone and trip.traveler.whatsapp_opt_in %}
             <div class="d-flex gap-2 flex-wrap justify-content-end">
-                <form method="post" action="{{ url_for('agent.send_whatsapp_summary', trip_id=trip.id) }}">
-                    <button
-                        class="btn btn-sm btn-primary"
-                        {% if not can_send_traveler_whatsapp %}disabled title="Traveler phone or WhatsApp opt-in missing"{% endif %}
-                    >
-                        Send WhatsApp To Traveler
-                    </button>
-                </form>
                 <button class="btn btn-sm btn-success" type="button" data-bs-toggle="collapse" data-bs-target="#whatsappShareBox" aria-expanded="false">
                     Generate WhatsApp URL
                 </button>
             </div>
         </div>
-        {% if not can_send_traveler_whatsapp %}
-        <p class="small text-muted mt-n2 mb-3">To send direct WhatsApp, traveler must have phone number and WhatsApp opt-in enabled.</p>
-        {% endif %}
 
         <div class="collapse mb-3" id="whatsappShareBox">
             <div class="card border-0 shadow-sm">
@@ -91,7 +79,26 @@
                     <form method="post" action="{{ url_for('agent.end_trip', trip_id=trip.id) }}">
                         <button class="btn btn-sm btn-outline-dark" {% if trip.status == 'completed' %}disabled{% endif %}>End Trip</button>
                     </form>
+                    {% if trip.status == 'liked' %}
+                        <form method="post" action="{{ url_for('agent.accept_interest', trip_id=trip.id) }}">
+                            <button class="btn btn-sm btn-success shadow-sm">
+                                <i class="bi bi-check-lg me-1"></i>Accept Traveler Interest
+                            </button>
+                        </form>
+                    {% endif %}
                 </div>
+                {% if trip.feedback_rating %}
+                <div class="mt-3 p-3 bg-success-subtle rounded border border-success-subtle">
+                    <h6 class="text-success-emphasis mb-1"><i class="bi bi-star-fill me-2"></i>Traveler Feedback</h6>
+                    <div class="d-flex align-items-center mb-2">
+                        {% for i in range(5) %}
+                            <i class="bi bi-star{{ '-fill' if i < trip.feedback_rating else '' }} text-warning"></i>
+                        {% endfor %}
+                        <span class="ms-2 fw-bold">{{ trip.feedback_rating }}/5</span>
+                    </div>
+                    <p class="mb-0 italic small text-muted">"{{ trip.feedback_text }}"</p>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -173,6 +180,7 @@
             <div class="card-body">
                 <h5>Hotel Booking System</h5>
                 <p class="text-muted small mb-2">Availability status is fetched live when provider data is available.</p>
+                {% if trip.status != 'completed' %}
                 <form method="post" action="{{ url_for('agent.create_booking', trip_id=trip.id) }}" class="row g-2">
                     <div class="col-md-4">
                         <label class="form-label">Hotel</label>
@@ -185,8 +193,14 @@
                             {% endfor %}
                         </select>
                     </div>
-                    <div class="col-md-2"><label class="form-label">Check-in</label><input class="form-control" type="date" name="checkin_date"></div>
-                    <div class="col-md-2"><label class="form-label">Check-out</label><input class="form-control" type="date" name="checkout_date"></div>
+                    <div class="col-md-2">
+                        <label class="form-label">Check-in</label>
+                        <input class="form-control" type="date" name="checkin_date" value="{{ trip.start_date }}" min="{{ trip.start_date }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Check-out</label>
+                        <input class="form-control" type="date" name="checkout_date" value="{{ (trip.start_date + timedelta(days=1)) }}" min="{{ trip.start_date }}">
+                    </div>
                     <div class="col-md-2">
                         <label class="form-label">Reference #</label>
                         <div class="input-group">
@@ -205,6 +219,11 @@
                     </div>
                     <div class="col-md-6 d-grid align-items-end"><button class="btn btn-dark mt-md-4">Confirm Booking</button></div>
                 </form>
+                {% else %}
+                <div class="alert alert-info border-0 shadow-sm mb-0">
+                    <i class="bi bi-info-circle me-2"></i>New bookings are disabled for completed trips.
+                </div>
+                {% endif %}
 
                 <div class="table-responsive mt-3">
                     <table class="table table-sm align-middle">

@@ -34,4 +34,20 @@ def ensure_sqlite_schema_updates() -> None:
     _add_column_if_missing("users", "phone", "VARCHAR(30)")
     _add_column_if_missing("users", "whatsapp_opt_in", "BOOLEAN NOT NULL DEFAULT 1")
     _add_column_if_missing("users", "google_sub", "VARCHAR(255)")
+    
+    _add_column_if_missing("bookings", "utr_number", "VARCHAR(100)")
+    _add_column_if_missing("bookings", "payment_screenshot", "VARCHAR(255)")
+    
+    _add_column_if_missing("trips", "feedback_rating", "INTEGER")
+    _add_column_if_missing("trips", "feedback_text", "TEXT")
+    
+    # Add updated_at to all tables using TimestampMixin
+    all_tables = [
+        "users", "clients", "agent_travelers", "trips", "destinations", 
+        "itineraries", "hotels", "bookings", "payments", "activities",
+        "itinerary_edit_requests", "notification_logs", "trip_update_requests"
+    ]
+    for table in all_tables:
+        _add_column_if_missing(table, "updated_at", "DATETIME DEFAULT '2026-01-01 00:00:00'")
+    
     db.session.commit()

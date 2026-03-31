@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta
 
 from flask import Flask
 from sqlalchemy import event
@@ -31,6 +32,7 @@ from app.services.seed_service import seed_hotels
 def create_app(config_class=Config):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_class)
+    app.jinja_env.globals.update(datetime=datetime, timedelta=timedelta)
     os.makedirs(app.config.get("INSTANCE_DIR", app.instance_path), exist_ok=True)
     os.makedirs(app.instance_path, exist_ok=True)
 
@@ -38,15 +40,7 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
 
     with app.app_context():
-        db.Model.metadata.create_all(
-            bind=db.engine,
-            tables=[
-                AgentTraveler.__table__,
-                ItineraryEditRequest.__table__,
-                NotificationLog.__table__,
-                TripUpdateRequest.__table__,
-            ],
-        )
+        db.create_all()
         ensure_sqlite_schema_updates()
 
     if app.config.get("SQLALCHEMY_DATABASE_URI", "").startswith("sqlite"):
