@@ -1,3 +1,4 @@
+import os
 from app import create_app, db
 
 # --- server entrypoint ---
