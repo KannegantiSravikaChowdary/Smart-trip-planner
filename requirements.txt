@@ -8,4 +8,4 @@ joblib==1.4.2
 gunicorn==21.2.0
 fpdf2
 icalendar
-sendgrid==6.11.0
+
