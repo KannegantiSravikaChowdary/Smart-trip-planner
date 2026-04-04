@@ -1,39 +1,28 @@
-from __future__ import annotations
+from flask import session
 from datetime import datetime, timedelta
-from secrets import randbelow
-from threading import Lock
-_STORE: dict[tuple[str, str], dict] = {}
-_LOCK = Lock()
-def _key(purpose: str, email: str) -> tuple[str, str]:
-    return purpose.strip().lower(), email.strip().lower()
-def _prune_expired(now: datetime) -> None:
-    expired_keys = [item_key for item_key, data in _STORE.items() if data["expires_at"] <= now]
-    for item_key in expired_keys:
-        _STORE.pop(item_key, None)
-def issue_otp(email: str, purpose: str, payload: dict | None = None, ttl_minutes: int = 10) -> str:
-    code = f"{randbelow(1_000_000):06d}"
-    now = datetime.utcnow()
-    record = {
+import random
+
+SESSION_KEY = "otp_data"
+
+def issue_otp(email: str, purpose: str, ttl_minutes: int = 5) -> str:
+    code = f"{random.randint(0, 999999):06d}"
+    session[SESSION_KEY] = {
+        "email": email.lower(),
+        "purpose": purpose.lower(),
         "code": code,
-        "payload": payload or {},
-        "expires_at": now + timedelta(minutes=max(1, ttl_minutes)),
+        "expires_at": (datetime.utcnow() + timedelta(minutes=ttl_minutes)).timestamp()
     }
-    with _LOCK:
-        _prune_expired(now)
-        _STORE[_key(purpose, email)] = record
     return code
 
-
 def verify_otp(email: str, purpose: str, code: str) -> tuple[bool, dict]:
-    now = datetime.utcnow()
-    with _LOCK:
-        _prune_expired(now)
-        item_key = _key(purpose, email)
-        record = _STORE.get(item_key)
-        if not record:
-            return False, {"message": "OTP expired or not found."}
-        if str(record["code"]).strip() != str(code).strip():
-            return False, {"message": "Invalid OTP."}
-        payload = record.get("payload", {})
-        _STORE.pop(item_key, None)
-    return True, {"payload": payload}
+    otp_record = session.get(SESSION_KEY)
+    if not otp_record:
+        return False, {"message": "OTP expired or not found."}
+    if otp_record["email"] != email.lower() or otp_record["purpose"] != purpose.lower():
+        return False, {"message": "Invalid OTP."}
+    if otp_record["code"] != code.strip():
+        return False, {"message": "Invalid OTP."}
+    if datetime.utcnow().timestamp() > otp_record["expires_at"]:
+        return False, {"message": "OTP expired."}
+    session.pop(SESSION_KEY)
+    return True, {"payload": {}}
