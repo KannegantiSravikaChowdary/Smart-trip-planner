@@ -18,13 +18,7 @@ def _mail_config() -> dict:
 def send_plain_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
     config = _mail_config()
 
-    if not all([
-        config["host"],
-        config["port"],
-        config["username"],
-        config["password"],
-        config["from_email"]
-    ]):
+    if not all([config["host"], config["port"], config["username"], config["password"], config["from_email"]]):
         return False, "Email configuration missing."
 
     msg = EmailMessage()
@@ -34,13 +28,9 @@ def send_plain_email(to_email: str, subject: str, body: str) -> tuple[bool, str]
     msg.set_content(body)
 
     try:
-        # Reduced timeout to avoid Render worker timeout
-        with smtplib.SMTP(config["host"], config["port"], timeout=10) as smtp:
-            smtp.ehlo()
-
+        with smtplib.SMTP(config["host"], config["port"], timeout=30) as smtp:
             if config["use_tls"]:
                 smtp.starttls()
-                smtp.ehlo()
 
             smtp.login(config["username"], config["password"])
             smtp.send_message(msg)
