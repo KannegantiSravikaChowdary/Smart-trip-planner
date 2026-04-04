@@ -1,28 +1,47 @@
-from flask import session
+from __future__ import annotations
 from datetime import datetime, timedelta
-import random
+from secrets import randbelow
+from threading import Lock
 
-SESSION_KEY = "otp_data"
+# In-memory store for OTPs
+_OTP_STORE: dict[tuple[str, str], dict] = {}
+_LOCK = Lock()
 
-def issue_otp(email: str, purpose: str, ttl_minutes: int = 5) -> str:
-    code = f"{random.randint(0, 999999):06d}"
-    session[SESSION_KEY] = {
-        "email": email.lower(),
-        "purpose": purpose.lower(),
+def _key(purpose: str, email: str) -> tuple[str, str]:
+    """Normalize key for OTP storage"""
+    return purpose.strip().lower(), email.strip().lower()
+
+def _prune_expired(now: datetime) -> None:
+    """Remove expired OTPs"""
+    expired = [k for k, v in _OTP_STORE.items() if v["expires_at"] <= now]
+    for k in expired:
+        _OTP_STORE.pop(k, None)
+
+def issue_otp(email: str, purpose: str, payload: dict | None = None, ttl_minutes: int = 10) -> str:
+    """Generate and store OTP"""
+    code = f"{randbelow(1_000_000):06d}"  # 6-digit OTP
+    now = datetime.utcnow()
+    record = {
         "code": code,
-        "expires_at": (datetime.utcnow() + timedelta(minutes=ttl_minutes)).timestamp()
+        "payload": payload or {},
+        "expires_at": now + timedelta(minutes=max(1, ttl_minutes)),
     }
+    with _LOCK:
+        _prune_expired(now)
+        _OTP_STORE[_key(purpose, email)] = record
     return code
 
 def verify_otp(email: str, purpose: str, code: str) -> tuple[bool, dict]:
-    otp_record = session.get(SESSION_KEY)
-    if not otp_record:
-        return False, {"message": "OTP expired or not found."}
-    if otp_record["email"] != email.lower() or otp_record["purpose"] != purpose.lower():
-        return False, {"message": "Invalid OTP."}
-    if otp_record["code"] != code.strip():
-        return False, {"message": "Invalid OTP."}
-    if datetime.utcnow().timestamp() > otp_record["expires_at"]:
-        return False, {"message": "OTP expired."}
-    session.pop(SESSION_KEY)
-    return True, {"payload": {}}
+    """Verify OTP"""
+    now = datetime.utcnow()
+    with _LOCK:
+        _prune_expired(now)
+        key = _key(purpose, email)
+        record = _OTP_STORE.get(key)
+        if not record:
+            return False, {"message": "OTP expired or not found."}
+        if str(record["code"]).strip() != str(code).strip():
+            return False, {"message": "Invalid OTP."}
+        payload = record.get("payload", {})
+        _OTP_STORE.pop(key, None)  # Remove OTP after successful verification
+    return True, {"payload": payload}
