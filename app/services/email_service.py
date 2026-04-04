@@ -1,48 +1,36 @@
 from __future__ import annotations
-import smtplib
-from email.message import EmailMessage
 from flask import current_app
-
-
-def _mail_config() -> dict:
-    return {
-        "host": current_app.config.get("MAIL_HOST"),
-        "port": int(current_app.config.get("MAIL_PORT", 587)),
-        "username": current_app.config.get("MAIL_USERNAME"),
-        "password": current_app.config.get("MAIL_PASSWORD"),
-        "use_tls": str(current_app.config.get("MAIL_USE_TLS", "True")).lower() == "true",
-        "from_email": current_app.config.get("MAIL_FROM"),
-    }
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 
 def send_plain_email(to_email: str, subject: str, body: str) -> tuple[bool, str]:
-    config = _mail_config()
 
-    if not all([config["host"], config["port"], config["username"], config["password"], config["from_email"]]):
+    api_key = current_app.config.get("SENDGRID_API_KEY")
+    from_email = current_app.config.get("MAIL_FROM")
+
+    if not api_key or not from_email:
         return False, "Email configuration missing."
 
-    msg = EmailMessage()
-    msg["From"] = config["from_email"]
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.set_content(body)
+    message = Mail(
+        from_email=from_email,
+        to_emails=to_email,
+        subject=subject,
+        plain_text_content=body
+    )
 
     try:
-        with smtplib.SMTP(config["host"], config["port"], timeout=30) as smtp:
-            if config["use_tls"]:
-                smtp.starttls()
-
-            smtp.login(config["username"], config["password"])
-            smtp.send_message(msg)
-
+        sg = SendGridAPIClient(api_key)
+        sg.send(message)
         return True, "Email sent successfully."
 
-    except Exception as exc:
-        current_app.logger.error(f"Email send failed: {exc}")
+    except Exception as e:
+        current_app.logger.error(f"Email send failed: {e}")
         return False, "Unable to send email right now. Please try again."
 
 
 def send_otp_email(to_email: str, otp: str, purpose: str, expiry_minutes: int) -> tuple[bool, str]:
+
     pretty_purpose = purpose.replace("_", " ").title()
 
     subject = f"{pretty_purpose} OTP - AI Air Trip Planner"
