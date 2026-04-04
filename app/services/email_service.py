@@ -1,9 +1,11 @@
+# mail_service.py
 from threading import Thread
 from flask import current_app
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 def _send_email_async(app, to_email: str, subject: str, body: str):
+    """Send email in a background thread with Flask app context"""
     with app.app_context():  # ensures current_app works inside thread
         api_key = current_app.config.get("MAIL_PASSWORD")  # SendGrid API key
         from_email = current_app.config.get("MAIL_FROM")
@@ -18,6 +20,7 @@ def _send_email_async(app, to_email: str, subject: str, body: str):
             subject=subject,
             plain_text_content=body
         )
+
         try:
             sg = SendGridAPIClient(api_key)
             sg.send(message)
@@ -27,6 +30,7 @@ def _send_email_async(app, to_email: str, subject: str, body: str):
 
 
 def send_otp_email(to_email: str, otp: str, purpose: str, expiry_minutes: int, app):
+    """Generate email content and send OTP asynchronously"""
     subject = f"{purpose.replace('_', ' ').title()} OTP - AI Air Trip Planner"
     body = (
         f"Hello,\n\n"
@@ -35,5 +39,12 @@ def send_otp_email(to_email: str, otp: str, purpose: str, expiry_minutes: int, a
         f"If you did not request this, please ignore this email.\n\n"
         f"- AI Air Trip Planner"
     )
-    Thread(target=_send_email_async, args=(app, to_email, subject, body), daemon=True).start()
+
+    # Start sending in a background thread
+    Thread(
+        target=_send_email_async,
+        args=(app, to_email, subject, body),
+        daemon=True
+    ).start()
+
     return True, "OTP email is being sent."
